@@ -1,0 +1,312 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ------------------------------------------------------------------ */
+/*  IHHH Event Navigator — design tokens                              */
+/*  Palette: modern blue (primary), teal (accent), white, purple.     */
+/*  Feel: premium enterprise event-app, playful & relaxed.            */
+/* ------------------------------------------------------------------ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-heading);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Brand colors — reusable across modules (avatar, game, leaderboard) */
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-purple: var(--brand-purple);
+  --color-brand-sky: var(--brand-sky);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+
+  /* Charts / leaderboard accents */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Sidebar (host panel) */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --radius: 0.9rem;
+
+  /* Surfaces — near-white with a faint cool tint */
+  --background: oklch(0.99 0.004 247);
+  --foreground: oklch(0.24 0.03 257);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.24 0.03 257);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.24 0.03 257);
+
+  /* Primary — modern blue */
+  --primary: oklch(0.57 0.19 257);
+  --primary-foreground: oklch(0.99 0.01 247);
+
+  /* Secondary — soft cool surface */
+  --secondary: oklch(0.96 0.014 247);
+  --secondary-foreground: oklch(0.32 0.04 257);
+
+  --muted: oklch(0.965 0.008 247);
+  --muted-foreground: oklch(0.53 0.03 252);
+
+  /* Accent — teal tint (hover / highlights) */
+  --accent: oklch(0.95 0.04 191);
+  --accent-foreground: oklch(0.44 0.08 196);
+
+  --destructive: oklch(0.58 0.22 25);
+
+  --border: oklch(0.92 0.012 250);
+  --input: oklch(0.92 0.012 250);
+  --ring: oklch(0.57 0.19 257);
+
+  /* Brand palette */
+  --brand-blue: oklch(0.57 0.19 257);
+  --brand-teal: oklch(0.72 0.12 185);
+  --brand-purple: oklch(0.62 0.2 300);
+  --brand-sky: oklch(0.84 0.08 233);
+  --success: oklch(0.7 0.14 162);
+  --success-foreground: oklch(0.99 0.01 247);
+  --warning: oklch(0.8 0.14 76);
+  --warning-foreground: oklch(0.31 0.05 70);
+
+  /* Charts / leaderboard — blue, teal, purple, amber, rose */
+  --chart-1: oklch(0.57 0.19 257);
+  --chart-2: oklch(0.72 0.12 185);
+  --chart-3: oklch(0.62 0.2 300);
+  --chart-4: oklch(0.8 0.15 76);
+  --chart-5: oklch(0.65 0.2 12);
+
+  --sidebar: oklch(0.985 0.005 247);
+  --sidebar-foreground: oklch(0.24 0.03 257);
+  --sidebar-primary: oklch(0.57 0.19 257);
+  --sidebar-primary-foreground: oklch(0.99 0.01 247);
+  --sidebar-accent: oklch(0.95 0.04 191);
+  --sidebar-accent-foreground: oklch(0.44 0.08 196);
+  --sidebar-border: oklch(0.92 0.012 250);
+  --sidebar-ring: oklch(0.57 0.19 257);
+}
+
+.dark {
+  /* Deep navy night mode */
+  --background: oklch(0.2 0.03 257);
+  --foreground: oklch(0.96 0.01 247);
+  --card: oklch(0.24 0.035 257);
+  --card-foreground: oklch(0.96 0.01 247);
+  --popover: oklch(0.24 0.035 257);
+  --popover-foreground: oklch(0.96 0.01 247);
+
+  --primary: oklch(0.66 0.16 256);
+  --primary-foreground: oklch(0.18 0.03 257);
+
+  --secondary: oklch(0.3 0.03 257);
+  --secondary-foreground: oklch(0.96 0.01 247);
+
+  --muted: oklch(0.29 0.025 257);
+  --muted-foreground: oklch(0.72 0.03 250);
+
+  --accent: oklch(0.4 0.06 196);
+  --accent-foreground: oklch(0.95 0.03 191);
+
+  --destructive: oklch(0.7 0.19 22);
+
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.66 0.16 256);
+
+  --brand-blue: oklch(0.66 0.16 256);
+  --brand-teal: oklch(0.76 0.12 185);
+  --brand-purple: oklch(0.7 0.18 300);
+  --brand-sky: oklch(0.78 0.09 233);
+  --success: oklch(0.74 0.14 162);
+  --success-foreground: oklch(0.18 0.03 257);
+  --warning: oklch(0.82 0.14 76);
+  --warning-foreground: oklch(0.22 0.04 70);
+
+  --chart-1: oklch(0.66 0.16 256);
+  --chart-2: oklch(0.76 0.12 185);
+  --chart-3: oklch(0.7 0.18 300);
+  --chart-4: oklch(0.82 0.15 76);
+  --chart-5: oklch(0.7 0.18 12);
+
+  --sidebar: oklch(0.24 0.035 257);
+  --sidebar-foreground: oklch(0.96 0.01 247);
+  --sidebar-primary: oklch(0.66 0.16 256);
+  --sidebar-primary-foreground: oklch(0.18 0.03 257);
+  --sidebar-accent: oklch(0.4 0.06 196);
+  --sidebar-accent-foreground: oklch(0.95 0.03 191);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.66 0.16 256);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  html {
+    @apply font-sans;
+  }
+  h1, h2, h3, h4, h5 {
+    @apply font-heading tracking-tight;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Brand utilities — gradients & glass surfaces                      */
+/* ------------------------------------------------------------------ */
+
+/* Soft full-page ambient backdrop for attendee screens */
+.bg-app-ambient {
+  background-color: var(--background);
+  background-image:
+    radial-gradient(38rem 38rem at 12% -8%, oklch(0.57 0.19 257 / 0.1), transparent 70%),
+    radial-gradient(34rem 34rem at 100% 0%, oklch(0.72 0.12 185 / 0.1), transparent 70%),
+    radial-gradient(40rem 40rem at 80% 110%, oklch(0.62 0.2 300 / 0.08), transparent 70%);
+}
+
+/* Primary brand gradient (buttons, avatar ring, hero accents) */
+.bg-brand-gradient {
+  background-image: linear-gradient(
+    135deg,
+    var(--brand-blue) 0%,
+    oklch(0.6 0.16 230) 45%,
+    var(--brand-purple) 100%
+  );
+}
+
+/* Cool blue→teal gradient (game / energetic accents) */
+.bg-brand-gradient-cool {
+  background-image: linear-gradient(
+    135deg,
+    var(--brand-blue) 0%,
+    var(--brand-teal) 100%
+  );
+}
+
+.text-gradient-brand {
+  background-image: linear-gradient(
+    120deg,
+    var(--brand-blue),
+    var(--brand-purple)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Frosted glass surface for floating cards / bars */
+.glass {
+  background-color: oklch(1 0 0 / 0.72);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+.dark .glass {
+  background-color: oklch(0.24 0.035 257 / 0.65);
+}
+
+/* Soft elevated shadow used on premium cards */
+.shadow-soft {
+  box-shadow:
+    0 1px 2px oklch(0.24 0.03 257 / 0.04),
+    0 8px 24px oklch(0.24 0.03 257 / 0.06);
+}
+.shadow-soft-lg {
+  box-shadow:
+    0 2px 4px oklch(0.24 0.03 257 / 0.05),
+    0 16px 48px oklch(0.24 0.03 257 / 0.1);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Avatar + ambient motion (the host should feel alive but calm)     */
+/* ------------------------------------------------------------------ */
+
+@keyframes ihhh-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes ihhh-blink {
+  0%, 91%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.08); }
+}
+@keyframes ihhh-pulse-ring {
+  0% { transform: scale(0.92); opacity: 0.55; }
+  70% { transform: scale(1.28); opacity: 0; }
+  100% { transform: scale(1.28); opacity: 0; }
+}
+@keyframes ihhh-sparkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.8) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.1) rotate(15deg); }
+}
+@keyframes ihhh-bob {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-4px) rotate(3deg); }
+}
+
+.animate-float { animation: ihhh-float 4s ease-in-out infinite; }
+.animate-blink {
+  animation: ihhh-blink 5.5s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.animate-pulse-ring { animation: ihhh-pulse-ring 2.8s ease-out infinite; }
+.animate-sparkle { animation: ihhh-sparkle 2.4s ease-in-out infinite; }
+.animate-bob { animation: ihhh-bob 3s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .animate-blink,
+  .animate-pulse-ring,
+  .animate-sparkle,
+  .animate-bob {
+    animation: none;
+  }
+}
