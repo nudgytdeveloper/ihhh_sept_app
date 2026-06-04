@@ -110,3 +110,17 @@ export const AVATAR_SCRIPTS: Record<EventPhase, AvatarScript> = {
     },
   },
 };
+
+/**
+ * Host's intro line for the schedule screen (Screen 2). Tokens: `{name}`,
+ * `{phase}` — render with `template()` from `@/utils/format`.
+ */
+export const SCHEDULE_INTRO =
+  "We're on {phase} right now, {name} — here's how the rest of your day unfolds.";
+
+/**
+ * Host's coaching line for the game lobby (Screen 3). Token: `{name}` — render
+ * with `template()` from `@/utils/format`.
+ */
+export const LOBBY_INTRO =
+  "You're in, {name}! Tap fast, beat the boss, and let's get you onto that leaderboard.";

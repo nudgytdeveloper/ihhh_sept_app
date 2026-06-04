@@ -63,8 +63,8 @@ schedule timeline are both driven by the current `EventPhase`.
 | # | Screen | Route | Status |
 |---|--------|-------|--------|
 | 1 | Attendee Navigator Home | `/` | ✅ built |
-| 2 | Event Schedule / Phase Timeline | `/schedule` | ⏳ scaffolded |
-| 3 | Game Lobby | `/game/lobby` | ⏳ scaffolded |
+| 2 | Event Schedule / Phase Timeline | `/schedule` | ✅ built |
+| 3 | Game Lobby | `/game/lobby` | ✅ built |
 | 4 | Virus Fight Game | `/game/play` | ⏳ scaffolded |
 | 5 | Host Game Control Panel | `/host` | ⏳ scaffolded |
 
@@ -156,13 +156,14 @@ src/
 │  ├─ app.ts                  # app/event identity + AVATAR_NAME
 │  ├─ routes.ts               # ROUTES
 │  ├─ statuses.ts             # RegistrationStatus, SeatStatus, AvatarMood, ActionIntent
-│  ├─ phases.ts               # EventPhase, PHASE_ORDER, PHASE_META
-│  ├─ game.ts                 # GameStatus, BossShape, SHAPE_META, GAME_CONFIG
-│  ├─ avatar-scripts.ts       # AVATAR_SCRIPTS (the rules-based Script Engine data)
+│  ├─ phases.ts               # EventPhase, PHASE_ORDER, PHASE_META, PhaseProgressState
+│  ├─ game.ts                 # GameStatus, BossShape, SHAPE_META, GAME_CONFIG, GAME_STATUS_META
+│  ├─ avatar-scripts.ts       # AVATAR_SCRIPTS + SCHEDULE_INTRO/LOBBY_INTRO (Script Engine)
 │  └─ index.ts                # barrel
 ├─ utils/                     # ⚠️ all reusable functions live here (see rules)
 │  ├─ format.ts               # formatCountdown, formatScore, getInitials, template
-│  ├─ event.ts                # phase helpers + getAvatarScript
+│  ├─ event.ts                # phase helpers (getPhaseState…) + getAvatarScript
+│  ├─ game.ts                 # game status helpers (getGameStatusMeta, getLobbyCtaLabel…)
 │  └─ index.ts                # barrel
 ├─ lib/
 │  └─ utils.ts                # shadcn `cn()` helper ONLY (ecosystem convention)
@@ -212,8 +213,45 @@ composed from `src/components/navigator/`:
 Supporting art: `src/components/game/mini-virus.tsx`. The page reads from
 `src/data/event.ts` (mock), defaulting to the Game Session phase.
 
+## Screen 2 — built
+
+**Event Schedule / Phase Timeline** is implemented at
+`src/app/(attendee)/schedule/page.tsx`, composed from `src/components/schedule/`:
+
+- `schedule-overview.tsx` — compact Navi guide + day-at-a-glance progress
+  ("Phase n of N", current phase, progress bar)
+- `schedule-timeline.tsx` — vertical phase timeline; each row's state comes from
+  `getPhaseState()` (`PhaseProgressState`: Done / Current / Next / Upcoming),
+  with labels from `PHASE_STATE_META`. The current phase is emphasized and
+  carries the single CTA, pulled from the Script Engine so the timeline and the
+  host stay in sync.
+
+Reads `MOCK_SCHEDULE` + `PHASE_META`; reuses `AvatarHost` and `Reveal` from
+`src/components/navigator/`. Verified mobile (430px) + desktop with no overflow.
+
+## Screen 3 — built
+
+**Game Lobby** is implemented at `src/app/(attendee)/game/lobby/page.tsx`,
+composed from `src/components/game/`:
+
+- `lobby-hero.tsx` — game banner: status pill, floating mini-viruses, and a
+  "who's in" player count with stacked avatars
+- `lobby-coach.tsx` — compact Navi coaching the attendee before the round
+- `how-to-play.tsx` — 3 rules (tap viruses → beat the COVID Boss by drawing a
+  shape → climb the leaderboard); numbers from `GAME_CONFIG`, shapes from
+  `SHAPE_META`
+- a sticky glass action bar with the single status-aware CTA
+
+Game state is driven by `GameStatus` via `GAME_STATUS_META` + the
+`src/utils/game.ts` helpers (`getGameStatusMeta`, `isGameJoinable`,
+`getLobbyCtaLabel`). Reuses `AvatarHost`, `MiniVirus`, and `Reveal`. Verified
+mobile (430px) + desktop with no overflow.
+
 ## Next step
 
-**Screen 2 — Event Schedule / Phase Timeline** (`/schedule`), reusing
-`PHASE_META` / `MOCK_SCHEDULE`, then the Game Lobby (Screen 3), Virus Fight game
-(Screen 4), and Host Control Panel (Screen 5).
+**Screen 4 — Virus Fight Game** (`/game/play`): the live round — tappable
+mini-viruses scoring `pointsPerVirus`, a `roundSeconds` countdown, live score,
+and the **COVID Boss** moment where the attendee draws a shape (circle / star /
+triangle / square) to defeat it for `bossBonusPoints`. Shape detection should be
+**simple/convincing for the demo, not perfect**. Then the Host Control Panel
+(Screen 5).

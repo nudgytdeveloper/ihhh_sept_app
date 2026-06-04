@@ -66,3 +66,61 @@ export const GAME_CONFIG = {
    */
   shapeMatchThreshold: 0.7,
 } as const;
+
+/** Display metadata for each game lifecycle state (reused across game screens). */
+export interface GameStatusMeta {
+  /** Short status label, e.g. for a pill. */
+  label: string;
+  /** One-line description of the state. */
+  description: string;
+  /** Dot/accent color class for the status indicator (Tailwind literal). */
+  dot: string;
+  /** Whether the round is live to play right now. */
+  joinable: boolean;
+}
+
+export const GAME_STATUS_META: Record<GameStatus, GameStatusMeta> = {
+  [GameStatus.Idle]: {
+    label: "Not started",
+    description: "The game hasn't opened yet — sit tight.",
+    dot: "bg-muted-foreground",
+    joinable: false,
+  },
+  [GameStatus.Lobby]: {
+    label: "Lobby open",
+    description: "Waiting for the host to start the round.",
+    dot: "bg-amber-500",
+    joinable: false,
+  },
+  [GameStatus.Active]: {
+    label: "Round live",
+    description: "The round is on — tap fast!",
+    dot: "bg-emerald-500",
+    joinable: true,
+  },
+  [GameStatus.BossActive]: {
+    label: "Boss fight",
+    description: "The COVID Boss is here — draw the shape!",
+    dot: "bg-rose-500",
+    joinable: true,
+  },
+  [GameStatus.Locked]: {
+    label: "Leaderboard locked",
+    description: "Scores are locked while the host tallies up.",
+    dot: "bg-indigo-500",
+    joinable: false,
+  },
+  [GameStatus.Ended]: {
+    label: "Game over",
+    description: "That's a wrap — see who topped the board!",
+    dot: "bg-slate-500",
+    joinable: false,
+  },
+};
+
+/** Lobby (Screen 3) primary-CTA labels, selected by game status. */
+export const LOBBY_CTA = {
+  waiting: "Enter the arena",
+  live: "Join the round now",
+  ended: "See the results",
+} as const;

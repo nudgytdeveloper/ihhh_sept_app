@@ -1,4 +1,10 @@
-import { EventPhase, PHASE_ORDER, PHASE_META, type PhaseMeta } from "@/constants/phases";
+import {
+  EventPhase,
+  PHASE_ORDER,
+  PHASE_META,
+  PhaseProgressState,
+  type PhaseMeta,
+} from "@/constants/phases";
 import { AVATAR_SCRIPTS, type AvatarScript } from "@/constants/avatar-scripts";
 
 /** Display metadata for a phase. */
@@ -27,6 +33,22 @@ export function getPhaseProgress(phase: EventPhase): number {
   const lastIndex = PHASE_ORDER.length - 1;
   if (lastIndex <= 0) return 1;
   return getPhaseIndex(phase) / lastIndex;
+}
+
+/**
+ * Progress state of `phase` relative to the `current` phase
+ * (Done → Current → Next → Upcoming). Drives the schedule timeline.
+ */
+export function getPhaseState(
+  current: EventPhase,
+  phase: EventPhase,
+): PhaseProgressState {
+  const currentIndex = getPhaseIndex(current);
+  const phaseIndex = getPhaseIndex(phase);
+  if (phaseIndex < currentIndex) return PhaseProgressState.Done;
+  if (phaseIndex === currentIndex) return PhaseProgressState.Current;
+  if (phaseIndex === currentIndex + 1) return PhaseProgressState.Next;
+  return PhaseProgressState.Upcoming;
 }
 
 /** The avatar's scripted line for the given phase. */

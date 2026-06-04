@@ -142,3 +142,41 @@ export const PHASE_META: Record<EventPhase, PhaseMeta> = {
     },
   },
 };
+
+/**
+ * Progress state of a phase relative to the current one — drives the schedule
+ * timeline's node/card styling and status label. Derive it with
+ * `getPhaseState()` from `@/utils/event` rather than comparing indices ad-hoc.
+ */
+export enum PhaseProgressState {
+  Done = "done",
+  Current = "current",
+  Next = "next",
+  Upcoming = "upcoming",
+}
+
+export interface PhaseStateMeta {
+  /** Status badge label shown on a timeline row. */
+  label: string;
+  /** Soft badge classes (kept literal so Tailwind detects them). */
+  chip: string;
+}
+
+export const PHASE_STATE_META: Record<PhaseProgressState, PhaseStateMeta> = {
+  [PhaseProgressState.Done]: {
+    label: "Done",
+    chip: "bg-muted text-muted-foreground",
+  },
+  [PhaseProgressState.Current]: {
+    label: "Happening now",
+    chip: "bg-teal-500/15 text-teal-700",
+  },
+  [PhaseProgressState.Next]: {
+    label: "Up next",
+    chip: "bg-blue-500/10 text-blue-700",
+  },
+  [PhaseProgressState.Upcoming]: {
+    label: "Upcoming",
+    chip: "bg-muted/70 text-muted-foreground",
+  },
+};

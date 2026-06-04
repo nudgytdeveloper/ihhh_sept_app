@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-04
+
+### Added
+- Screen 3 — Game Lobby (/game/lobby): game-branded hero with live status + player count, Navi coach bubble, 3-step how-to-play (tap viruses, beat the COVID Boss by drawing a shape, climb the leaderboard), and a sticky status-aware CTA action bar
+- GAME_STATUS_META + LOBBY_CTA constants and src/utils/game.ts helpers (getGameStatusMeta, isGameJoinable, isGameOver, getLobbyCtaLabel)
+- LOBBY_INTRO host coaching copy for the game lobby
+- Screen 2 — Event Schedule / Phase Timeline (/schedule): compact Navi guide + day-at-a-glance progress and a vertical phase timeline (done/current/upcoming) with the current phase emphasized and carrying its Avatar Script Engine CTA
+- PhaseProgressState enum, PHASE_STATE_META, and getPhaseState() helper for phase-relative timeline state
+- SCHEDULE_INTRO host intro copy for the schedule screen
+
 ## 2026-06-03
 
 ### Added
