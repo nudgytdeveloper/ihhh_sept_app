@@ -65,7 +65,7 @@ schedule timeline are both driven by the current `EventPhase`.
 | 1 | Attendee Navigator Home | `/` | ✅ built |
 | 2 | Event Schedule / Phase Timeline | `/schedule` | ✅ built |
 | 3 | Game Lobby | `/game/lobby` | ✅ built |
-| 4 | Virus Fight Game | `/game/play` | ⏳ scaffolded |
+| 4 | Virus Fight Game | `/game/play` | ✅ built |
 | 5 | Host Game Control Panel | `/host` | ⏳ scaffolded |
 
 Routes are centralized in `src/constants/routes.ts` (`ROUTES`).
@@ -127,8 +127,9 @@ Production-ready look, not wireframe.
   auto-applied to `h1–h5`), **Geist Mono** (`font-mono`, great for timers/scores)
 - Radius is generous (`--radius: 0.9rem`) for the soft, rounded, playful feel
 - Motion: `.animate-float` / `.animate-blink` / `.animate-pulse-ring` /
-  `.animate-sparkle` / `.animate-bob` (avatar + ambient), all disabled under
-  `prefers-reduced-motion`; `<Reveal>` wraps sections for staggered entrances
+  `.animate-sparkle` / `.animate-bob` / `.animate-pop-rise` (avatar + ambient +
+  game score popups), all disabled under `prefers-reduced-motion`; `<Reveal>`
+  wraps sections for staggered entrances
 
 ---
 
@@ -157,13 +158,14 @@ src/
 │  ├─ routes.ts               # ROUTES
 │  ├─ statuses.ts             # RegistrationStatus, SeatStatus, AvatarMood, ActionIntent
 │  ├─ phases.ts               # EventPhase, PHASE_ORDER, PHASE_META, PhaseProgressState
-│  ├─ game.ts                 # GameStatus, BossShape, SHAPE_META, GAME_CONFIG, GAME_STATUS_META
-│  ├─ avatar-scripts.ts       # AVATAR_SCRIPTS + SCHEDULE_INTRO/LOBBY_INTRO (Script Engine)
+│  ├─ game.ts                 # GameStatus, BossShape, SHAPE_META, GAME_CONFIG, GAME_STATUS_META, RoundPhase, BossOutcome
+│  ├─ avatar-scripts.ts       # AVATAR_SCRIPTS + SCHEDULE_INTRO/LOBBY_INTRO/GAME_SCRIPTS (Script Engine)
 │  └─ index.ts                # barrel
 ├─ utils/                     # ⚠️ all reusable functions live here (see rules)
 │  ├─ format.ts               # formatCountdown, formatScore, getInitials, template
 │  ├─ event.ts                # phase helpers (getPhaseState…) + getAvatarScript
-│  ├─ game.ts                 # game status helpers (getGameStatusMeta, getLobbyCtaLabel…)
+│  ├─ game.ts                 # game status + leaderboard helpers (getGameStatusMeta, getLiveRank…)
+│  ├─ shape-detection.ts      # boss draw-to-defeat matcher (matchShape / classifyStroke)
 │  └─ index.ts                # barrel
 ├─ lib/
 │  └─ utils.ts                # shadcn `cn()` helper ONLY (ecosystem convention)
@@ -247,11 +249,40 @@ Game state is driven by `GameStatus` via `GAME_STATUS_META` + the
 `getLobbyCtaLabel`). Reuses `AvatarHost`, `MiniVirus`, and `Reveal`. Verified
 mobile (430px) + desktop with no overflow.
 
+## Screen 4 — built
+
+**Virus Fight Game** is implemented at `src/app/(attendee)/game/play/page.tsx`
+(a thin server component that exports `metadata` and renders the client game),
+composed from `src/components/game/`:
+
+- `virus-fight-game.tsx` — **`"use client"`** orchestrator. A `RoundPhase` state
+  machine: `Intro` (3-2-1-GO countdown) → `Active` (tap mini-viruses) → `Boss`
+  (draw the shape) → back to `Active` → `Ended` (summary). The round clock pauses
+  during the boss fight; all transitions fire from timer callbacks (refs as the
+  live source of truth) — no `setState` in effect bodies.
+- `game-hud.tsx` — live score, `getLiveRank()` standing, countdown (turns urgent
+  at `lowTimeThresholdSeconds`) + time-progress bar
+- `tappable-virus.tsx` — a single floating `MiniVirus` button (`ActiveVirus`);
+  pop = `+pointsPerVirus` and an `.animate-pop-rise` score popup
+- `boss-virus.tsx` — the crowned COVID Boss art
+- `boss-fight.tsx` — **`"use client"`** draw surface: pointer-stroke capture +
+  live polyline + target guide + boss timer; calls `matchShape()` and reports a
+  defeat to the parent (which awards `bossBonusPoints`). Parent owns the escape
+  (timeout). Result flourishes driven by `BossOutcome`.
+- `game-intro.tsx` / `round-summary.tsx` — Navi-led get-ready + end-of-round overlays
+
+Shape detection lives in `src/utils/shape-detection.ts` (`matchShape`,
+`classifyStroke`) — a resample + cvR-band + corner-count heuristic, tuned so a
+cooperative attempt at the asked shape passes `GAME_CONFIG.shapeMatchThreshold`
+(0.7) while a dot/line/wrong shape fails: **simple/convincing, not perfect**.
+Verified end-to-end in headless Chrome (circle/triangle/square defeats) across
+all phases at mobile (430px) + desktop with no overflow.
+
 ## Next step
 
-**Screen 4 — Virus Fight Game** (`/game/play`): the live round — tappable
-mini-viruses scoring `pointsPerVirus`, a `roundSeconds` countdown, live score,
-and the **COVID Boss** moment where the attendee draws a shape (circle / star /
-triangle / square) to defeat it for `bossBonusPoints`. Shape detection should be
-**simple/convincing for the demo, not perfect**. Then the Host Control Panel
-(Screen 5).
+**Screen 5 — Host Game Control Panel** (`/host`): the host control room — start /
+end the round, spawn a mini-virus wave, spawn the boss + pick the required
+`BossShape`, lock the leaderboard, view the live leaderboard, announce the
+winner, push reminders. Drives `GameStatus` (reuse `GAME_STATUS_META` /
+`src/utils/game.ts`) — the attendee game (Screen 4) reacts to it. Uses the host
+shell at `src/app/host/layout.tsx`; currently a `ScreenStub`.

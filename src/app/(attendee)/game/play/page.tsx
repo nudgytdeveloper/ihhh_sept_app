@@ -1,19 +1,12 @@
-import { Gamepad2 } from "lucide-react";
-import { ScreenStub } from "@/components/scaffold/screen-stub";
-import { ROUTES } from "@/constants/routes";
+import { VirusFightGame } from "@/components/game/virus-fight-game";
 import { GAME_NAME } from "@/constants/game";
 
-export const metadata = { title: "Virus Fight" };
+export const metadata = { title: GAME_NAME };
 
+/**
+ * Screen 4 — Virus Fight. The interactive round lives in the VirusFightGame
+ * client component; this page stays a server component so it can export metadata.
+ */
 export default function VirusFightPage() {
-  return (
-    <ScreenStub
-      icon={Gamepad2}
-      eyebrow="Screen 4"
-      title={GAME_NAME}
-      description="Tap cute mini-viruses for points against a live countdown and leaderboard — then draw a shape to defeat the COVID boss for bonus points."
-      gradient="from-teal-400 via-cyan-500 to-blue-500"
-      currentHref={ROUTES.GAME_PLAY}
-    />
-  );
+  return <VirusFightGame />;
 }

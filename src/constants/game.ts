@@ -24,6 +24,31 @@ export enum GameStatus {
   Ended = "ended",
 }
 
+/**
+ * Fine-grained phase of a single live round (Screen 4 client state machine).
+ * Distinct from GameStatus, which is the host/session-level lifecycle.
+ */
+export enum RoundPhase {
+  /** "Get ready" countdown before the round begins. */
+  Intro = "intro",
+  /** Tapping mini-viruses for points against the clock. */
+  Active = "active",
+  /** Boss on screen — draw the required shape to defeat it. */
+  Boss = "boss",
+  /** Round over — show final score + standing. */
+  Ended = "ended",
+}
+
+/** Result of a boss encounter. */
+export enum BossOutcome {
+  /** Still fighting — drawing accepted. */
+  Pending = "pending",
+  /** Correct shape drawn in time — bonus awarded. */
+  Defeated = "defeated",
+  /** Time ran out before a matching shape — no bonus. */
+  Escaped = "escaped",
+}
+
 /** Shapes the attendee can be asked to draw to defeat the boss. */
 export enum BossShape {
   Circle = "circle",
@@ -65,6 +90,22 @@ export const GAME_CONFIG = {
    * Detection is intentionally forgiving for the demo — convincing, not perfect.
    */
   shapeMatchThreshold: 0.7,
+
+  /* --- live-round timing (Screen 4) --- */
+  /** "Get ready" countdown length before a round starts, in seconds. */
+  introSeconds: 3,
+  /** Boss appears once the round clock drops to this many seconds remaining. */
+  bossSpawnAtSecondsRemaining: 35,
+  /** Max mini-viruses visible at once (older ones cycle out / "escape"). */
+  maxVirusesOnScreen: 7,
+  /** How often a new mini-virus pops into the arena, in ms. */
+  virusSpawnIntervalMs: 650,
+  /** How long a floating "+points" indicator lingers, in ms. */
+  popupLifetimeMs: 750,
+  /** How long the boss defeated/escaped flourish shows before resuming, in ms. */
+  bossResolveDelayMs: 1300,
+  /** At/below this many seconds remaining, the timer reads as "low" (urgent). */
+  lowTimeThresholdSeconds: 10,
 } as const;
 
 /** Display metadata for each game lifecycle state (reused across game screens). */

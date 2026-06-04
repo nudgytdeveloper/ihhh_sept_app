@@ -124,3 +124,20 @@ export const SCHEDULE_INTRO =
  */
 export const LOBBY_INTRO =
   "You're in, {name}! Tap fast, beat the boss, and let's get you onto that leaderboard.";
+
+/**
+ * Host lines for the live round (Screen 4). Tokens vary per line:
+ * `{name}`, `{shape}`, `{boss}` — render with `template()` from `@/utils/format`.
+ */
+export const GAME_SCRIPTS = {
+  /** Shown over the pre-round countdown. */
+  getReady: "Get ready, {name} — tap everything that moves!",
+  /** Shown when the boss appears. */
+  bossWarning: "Incoming! Draw a {shape} to blast the {boss}!",
+  /** Shown when the boss is defeated. */
+  bossDefeated: "Boom! The {boss} never stood a chance. 💥",
+  /** Shown when the boss escapes (time ran out). */
+  bossEscaped: "It slipped away — keep tapping, you've got this!",
+  /** Shown on the end-of-round summary. */
+  gameOver: "What a run, {name}! Here's how you stacked up.",
+} as const;

@@ -8,3 +8,4 @@
 export * from "./format";
 export * from "./event";
 export * from "./game";
+export * from "./shape-detection";
