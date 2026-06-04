@@ -45,3 +45,40 @@ export function getLiveRank(score: number, leaderboard: LeaderboardEntry[]): num
 export function getPlayersBeaten(score: number, leaderboard: LeaderboardEntry[]): number {
   return others(leaderboard).filter((entry) => entry.score < score).length;
 }
+
+/** Which host-control actions are available for a given game status (Screen 5). */
+export interface HostControls {
+  /** Begin the round (kick off play). */
+  canStart: boolean;
+  /** Send a wave of mini-viruses into the arena. */
+  canSpawnWave: boolean;
+  /** Unleash the COVID Boss with a required shape. */
+  canSpawnBoss: boolean;
+  /** Send the boss away and resume normal play. */
+  canResumeRound: boolean;
+  /** Freeze the leaderboard for final scoring. */
+  canLock: boolean;
+  /** Announce the winner. */
+  canAnnounce: boolean;
+  /** End the game. */
+  canEnd: boolean;
+}
+
+export function getHostControls(status: GameStatus): HostControls {
+  const live = status === GameStatus.Active;
+  const boss = status === GameStatus.BossActive;
+  return {
+    canStart: status === GameStatus.Idle || status === GameStatus.Lobby,
+    canSpawnWave: live,
+    canSpawnBoss: live,
+    canResumeRound: boss,
+    canLock: live || boss || status === GameStatus.Ended,
+    canAnnounce: status === GameStatus.Locked || status === GameStatus.Ended,
+    canEnd: live || boss || status === GameStatus.Locked,
+  };
+}
+
+/** The current leader (highest score) on a leaderboard. */
+export function getWinner(leaderboard: LeaderboardEntry[]): LeaderboardEntry | undefined {
+  return [...leaderboard].sort((a, b) => b.score - a.score)[0];
+}

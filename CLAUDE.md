@@ -66,7 +66,7 @@ schedule timeline are both driven by the current `EventPhase`.
 | 2 | Event Schedule / Phase Timeline | `/schedule` | ✅ built |
 | 3 | Game Lobby | `/game/lobby` | ✅ built |
 | 4 | Virus Fight Game | `/game/play` | ✅ built |
-| 5 | Host Game Control Panel | `/host` | ⏳ scaffolded |
+| 5 | Host Game Control Panel | `/host` | ✅ built |
 
 Routes are centralized in `src/constants/routes.ts` (`ROUTES`).
 
@@ -160,11 +160,12 @@ src/
 │  ├─ phases.ts               # EventPhase, PHASE_ORDER, PHASE_META, PhaseProgressState
 │  ├─ game.ts                 # GameStatus, BossShape, SHAPE_META, GAME_CONFIG, GAME_STATUS_META, RoundPhase, BossOutcome
 │  ├─ avatar-scripts.ts       # AVATAR_SCRIPTS + SCHEDULE_INTRO/LOBBY_INTRO/GAME_SCRIPTS (Script Engine)
+│  ├─ host.ts                 # HOST_REMINDERS, LogTone + LOG_TONE_DOT (host panel)
 │  └─ index.ts                # barrel
 ├─ utils/                     # ⚠️ all reusable functions live here (see rules)
 │  ├─ format.ts               # formatCountdown, formatScore, getInitials, template
 │  ├─ event.ts                # phase helpers (getPhaseState…) + getAvatarScript
-│  ├─ game.ts                 # game status + leaderboard helpers (getGameStatusMeta, getLiveRank…)
+│  ├─ game.ts                 # game/leaderboard/host helpers (getGameStatusMeta, getLiveRank, getHostControls…)
 │  ├─ shape-detection.ts      # boss draw-to-defeat matcher (matchShape / classifyStroke)
 │  └─ index.ts                # barrel
 ├─ lib/
@@ -278,11 +279,36 @@ cooperative attempt at the asked shape passes `GAME_CONFIG.shapeMatchThreshold`
 Verified end-to-end in headless Chrome (circle/triangle/square defeats) across
 all phases at mobile (430px) + desktop with no overflow.
 
-## Next step
+## Screen 5 — built
 
-**Screen 5 — Host Game Control Panel** (`/host`): the host control room — start /
-end the round, spawn a mini-virus wave, spawn the boss + pick the required
-`BossShape`, lock the leaderboard, view the live leaderboard, announce the
-winner, push reminders. Drives `GameStatus` (reuse `GAME_STATUS_META` /
-`src/utils/game.ts`) — the attendee game (Screen 4) reacts to it. Uses the host
-shell at `src/app/host/layout.tsx`; currently a `ScreenStub`.
+**Host Game Control Panel** is implemented at `src/app/host/page.tsx` (a thin
+server component that exports `metadata` and renders the client panel), composed
+from `src/components/host/`:
+
+- `host-control-panel.tsx` — **`"use client"`** orchestrator. Owns the session
+  state and drives `GameStatus` via `getHostControls()` (which actions are
+  available per status). Each action fires a `sonner` toast + an activity-log
+  entry. Renders the waves + reminders cards inline.
+- `host-status-banner.tsx` — "now playing" bar: current `GameStatus`
+  (`GAME_STATUS_META`) + player/wave/boss stats + flow controls (Start / End /
+  Reset), enabled per status
+- `boss-control.tsx` — pick a `BossShape` and unleash the boss (Active →
+  BossActive); "Resume round" sends it away
+- `host-leaderboard.tsx` — live leaderboard (medals + current-user highlight),
+  Lock toggle, and Announce winner (crowns `getWinner()` with a 🏆 badge)
+- `host-activity-log.tsx` — timestamped feed of recent actions (newest first,
+  capped), tone-colored via `LOG_TONE_DOT`
+
+Reads `MOCK_EVENT_STATE` + `MOCK_LEADERBOARD`. Uses the wider control-room shell
+at `src/app/host/layout.tsx` (`max-w-5xl`, no ambient gradient). Verified
+end-to-end in headless Chrome (full Lobby → Active → Boss → Ended → Locked flow,
+winner announce, reminder toasts) at mobile (430px) + desktop with no overflow.
+
+## Status — demo complete 🎉
+
+All **5 demo screens are built** (see the scope table above). `ScreenStub`
+(`src/components/scaffold`) is now unused — keep it for any future scaffolding.
+Remaining polish/extension ideas (not yet requested): wire a shared realtime
+backend so the Host panel (Screen 5) actually drives the attendee game
+(Screen 4) live, add voice to Navi, and flesh out the remaining (post-demo)
+modules beyond these 5.
