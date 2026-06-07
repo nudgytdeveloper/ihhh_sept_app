@@ -92,6 +92,11 @@ Ask the audience to open **`<your-url>/game/play`** on their phones (share the Q
 / link). Each phone shows the live round; when the host is connected they'll see
 a **"Live · hosted from the control room"** badge.
 
+Watch the **"online" count** climb in real time as phones connect — it shows on
+the host status banner (**"N online"**) and on every attendee's home/lobby. A nice
+beat: "that number is every phone in this room, live." It ticks back down as
+people close the tab.
+
 > No host action needed for them to join — the server replays the current
 > session to every phone the moment it connects, in any order.
 
