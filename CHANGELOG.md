@@ -3,6 +3,11 @@
 ## 2026-06-07
 
 ### Added
+- Live attendee headcount over SSE: the server tracks distinct connected attendee devices (refcounted per device so multiple tabs count once, the host excluded) and fans the count out as a Presence realtime message — replayed on connect; surfaced via AttendeeShell's usePlayerCount() and GameChannel/useGameChannel onPresence (attendees pass their playerId on the stream)
+- Attendee onboarding: a Navi-led welcome step asks the attendee's name and shows an auto-allocated seat; the entered name + seat then drive the navigator persona (home/schedule/lobby/status) and the shared leaderboard handle, replacing the mock attendee
+- Live event journey: the event phase is now host-driven shared state over SSE — the Host Control Panel (Screen 5) has an Event Journey control (advance to next / jump to any phase) and every attendee's Navi message, journey track, and schedule update live; the journey starts at phase 1 (Registered)
+- Phase realtime message + hub state (publishPhase/getCurrentPhase with replay-on-connect), GameChannel.publishPhase / useGameChannel onPhase, and an attendee EventPhase context (AttendeeShell + useEventPhase)
+- Per-device identity now persists an auto-allocated seat + onboarded flag (completeOnboarding) plus an attendeeFromIdentity helper; seat-allocation constants in src/constants/player.ts
 - Shared live leaderboard: each attendee's score flows into one server-aggregated board that updates live on the Host Control Panel (Screen 5) — the host announces the winner from the real top scorer; the board freezes on lock and clears on reset
 - Per-device player identity (stable id + auto-generated handle like "Swift Otter", persisted to localStorage) so the shared leaderboard shows distinct players across phones — src/utils/player-identity.ts (usePlayerIdentity) + src/constants/player.ts
 - Score (attendee→server) + Leaderboard (server→all) realtime messages, the ScoreEntry type, and GameChannel.publishScore / useGameChannel onLeaderboard
@@ -15,7 +20,13 @@
 - Voice constants (src/constants/voice.ts: VOICE_CONFIG, VOICE_PREF, VOICE_STORAGE_KEY) + navi-voice util (speakLine, useNaviVoice; src/utils/navi-voice.ts)
 
 ### Changed
+- The home game-preview, the lobby hero, and the host status banner now show the live connected-attendee count (server-tracked presence) instead of the seeded 48 — labeled "online"; the lobby is now a thin server page rendering a live client orchestrator (LobbyScreen), and the lobby's stacked avatar faces are capped to the live count
+- The home game-preview leaderboard peek now reads the shared live board (server-aggregated, via the AttendeeShell subscription + useLiveLeaderboard context), falling back to a no-"You" sample teaser only before any scores arrive
+- The navigator persona (name, seat, check-in) now comes from the onboarded per-device identity instead of the mock attendee; the attendee home + schedule are thin server pages rendering live client orchestrators (host-driven phase), and the attendee shell owns a single realtime subscription (phase + reminders + leaderboard)
 - Host leaderboard and the attendee in-round rank now read from the shared live board instead of mock data (the mock leaderboard remains only as a solo-play fallback for rank when no other players are present)
+
+### Removed
+- AttendeeRealtimeListener (folded into the new AttendeeShell, which owns the attendee-area realtime subscription)
 
 ## 2026-06-04
 

@@ -1,7 +1,7 @@
 import { Compass } from "lucide-react";
 import { APP_NAME, EVENT_NAME, EVENT_VENUE } from "@/constants/app";
 import { NaviVoiceToggle } from "@/components/navigator/navi-voice-toggle";
-import { AttendeeRealtimeListener } from "@/components/navigator/attendee-realtime-listener";
+import { AttendeeShell } from "@/components/navigator/attendee-shell";
 
 /**
  * Shell for all attendee-facing screens: soft ambient backdrop, branded
@@ -34,11 +34,10 @@ export default function AttendeeLayout({
         </div>
       </header>
 
-      {/* Listens for host-pushed reminders on any attendee screen. */}
-      <AttendeeRealtimeListener />
-
+      {/* Owns the attendee realtime subscription (live phase + reminders) and
+          gates the app behind the welcome step until the attendee is onboarded. */}
       <main className="mx-auto flex w-full max-w-lg flex-1 flex-col">
-        {children}
+        <AttendeeShell>{children}</AttendeeShell>
       </main>
     </div>
   );

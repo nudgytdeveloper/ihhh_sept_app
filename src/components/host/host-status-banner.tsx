@@ -47,7 +47,7 @@ export function HostStatusBanner({
             <h1 className="font-heading text-2xl font-bold leading-tight">{meta.label}</h1>
             <p className="text-sm text-muted-foreground">{meta.description}</p>
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
-              <Stat icon={Users}>{playerCount} players</Stat>
+              <Stat icon={Users}>{playerCount} online</Stat>
               <Stat icon={Zap}>{waves} sent</Stat>
               {BossIcon && activeBossShape ? (
                 <Stat icon={BossIcon} tone="bg-rose-500/10 text-rose-600">

@@ -6,6 +6,7 @@ import {
   RealtimeMessage,
   RealtimeTransport,
 } from "@/constants/realtime";
+import type { EventPhase } from "@/constants/phases";
 import type { GameSessionState, ScoreEntry } from "@/types";
 
 /** A message exchanged over the realtime game channel. */
@@ -14,7 +15,9 @@ export type RealtimeChannelMessage =
   | { type: RealtimeMessage.Reminder; reminderId: string }
   | { type: RealtimeMessage.RequestState }
   | { type: RealtimeMessage.Score; entry: ScoreEntry }
-  | { type: RealtimeMessage.Leaderboard; entries: ScoreEntry[] };
+  | { type: RealtimeMessage.Leaderboard; entries: ScoreEntry[] }
+  | { type: RealtimeMessage.Phase; phase: EventPhase }
+  | { type: RealtimeMessage.Presence; count: number };
 
 export type RealtimeHandler = (message: RealtimeChannelMessage) => void;
 
@@ -28,6 +31,7 @@ interface Transport {
   publishState(state: GameSessionState): void;
   publishReminder(reminderId: string): void;
   publishScore(entry: ScoreEntry): void;
+  publishPhase(phase: EventPhase): void;
   requestState(): void;
   close(): void;
 }
@@ -57,6 +61,9 @@ class BroadcastTransport implements Transport {
     // No server to aggregate in same-browser mode; relayed for completeness.
     this.channel?.postMessage({ type: RealtimeMessage.Score, entry });
   }
+  publishPhase(phase: EventPhase): void {
+    this.channel?.postMessage({ type: RealtimeMessage.Phase, phase });
+  }
   requestState(): void {
     this.channel?.postMessage({ type: RealtimeMessage.RequestState });
   }
@@ -71,9 +78,14 @@ class SseTransport implements Transport {
   private source: EventSource | null = null;
   private handlers = new Set<RealtimeHandler>();
 
-  constructor() {
+  /** `playerId` (attendees only) is sent so the server counts live presence; the
+   *  host omits it and is not counted toward the headcount. */
+  constructor(playerId?: string) {
     if (typeof window === "undefined" || typeof EventSource === "undefined") return;
-    const source = new EventSource(REALTIME_SSE_PATH);
+    const url = playerId
+      ? `${REALTIME_SSE_PATH}?playerId=${encodeURIComponent(playerId)}`
+      : REALTIME_SSE_PATH;
+    const source = new EventSource(url);
     source.addEventListener(RealtimeMessage.State, (event) => {
       this.emit({ type: RealtimeMessage.State, state: JSON.parse((event as MessageEvent).data) });
     });
@@ -86,6 +98,14 @@ class SseTransport implements Transport {
         type: RealtimeMessage.Leaderboard,
         entries: JSON.parse((event as MessageEvent).data),
       });
+    });
+    source.addEventListener(RealtimeMessage.Phase, (event) => {
+      const { phase } = JSON.parse((event as MessageEvent).data);
+      this.emit({ type: RealtimeMessage.Phase, phase });
+    });
+    source.addEventListener(RealtimeMessage.Presence, (event) => {
+      const { count } = JSON.parse((event as MessageEvent).data);
+      this.emit({ type: RealtimeMessage.Presence, count });
     });
     this.source = source;
   }
@@ -113,6 +133,9 @@ class SseTransport implements Transport {
   publishScore(entry: ScoreEntry): void {
     this.post({ type: RealtimeMessage.Score, entry });
   }
+  publishPhase(phase: EventPhase): void {
+    this.post({ type: RealtimeMessage.Phase, phase });
+  }
   requestState(): void {
     // No-op: the server replays the current state + board to every new EventSource.
   }
@@ -131,14 +154,15 @@ class NoopTransport implements Transport {
   publishState(): void {}
   publishReminder(): void {}
   publishScore(): void {}
+  publishPhase(): void {}
   requestState(): void {}
   close(): void {}
 }
 
-function createTransport(): Transport {
+function createTransport(playerId?: string): Transport {
   if (typeof window === "undefined") return new NoopTransport();
   if (REALTIME_TRANSPORT === RealtimeTransport.Broadcast) return new BroadcastTransport();
-  if (typeof EventSource !== "undefined") return new SseTransport();
+  if (typeof EventSource !== "undefined") return new SseTransport(playerId);
   return new BroadcastTransport();
 }
 
@@ -146,12 +170,16 @@ function createTransport(): Transport {
  * Transport-agnostic host ⇄ attendee game channel. Picks SSE (cross-device, via
  * the Render web service) or BroadcastChannel (same-browser, local dev) based on
  * `REALTIME_TRANSPORT` — callers (`useGameChannel`) don't care which is active.
+ *
+ * `playerId` (attendees only) is forwarded to the transport so the server counts
+ * this device toward the live presence headcount; the host constructs the channel
+ * without one.
  */
 export class GameChannel {
   private transport: Transport;
 
-  constructor() {
-    this.transport = createTransport();
+  constructor(playerId?: string) {
+    this.transport = createTransport(playerId);
   }
   subscribe(handler: RealtimeHandler): () => void {
     return this.transport.subscribe(handler);
@@ -164,6 +192,9 @@ export class GameChannel {
   }
   publishScore(entry: ScoreEntry): void {
     this.transport.publishScore(entry);
+  }
+  publishPhase(phase: EventPhase): void {
+    this.transport.publishPhase(phase);
   }
   requestState(): void {
     this.transport.requestState();

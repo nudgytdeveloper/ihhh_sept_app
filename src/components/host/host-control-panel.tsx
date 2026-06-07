@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { HostStatusBanner } from "@/components/host/host-status-banner";
+import { EventJourneyControl } from "@/components/host/event-journey-control";
 import { BossControl } from "@/components/host/boss-control";
 import { HostLeaderboard } from "@/components/host/host-leaderboard";
 import { HostActivityLog, type LogEntry } from "@/components/host/host-activity-log";
@@ -24,6 +25,7 @@ import {
   GAME_NAME,
   BOSS_NAME,
 } from "@/constants/game";
+import { EventPhase, PHASE_ORDER, PHASE_META } from "@/constants/phases";
 import { LogTone, HOST_REMINDERS, type HostReminder } from "@/constants/host";
 import { getHostControls, getWinner, toLeaderboard } from "@/utils/game";
 import { useGameChannel } from "@/utils/use-game-channel";
@@ -39,9 +41,12 @@ import type { LeaderboardEntry, GameSessionState, ScoreEntry } from "@/types";
  * toast + activity-log entry for feedback.
  */
 export function HostControlPanel() {
-  const playerCount = MOCK_EVENT_STATE.game.playerCount;
+  // Live count of attendee devices connected to the realtime stream (the host
+  // itself isn't counted). 0 until the first attendee joins.
+  const [playerCount, setPlayerCount] = useState(0);
 
   const [status, setStatus] = useState<GameStatus>(MOCK_EVENT_STATE.game.status);
+  const [phase, setPhase] = useState<EventPhase>(PHASE_ORDER[0]);
   const [selectedShape, setSelectedShape] = useState<BossShape>(BossShape.Circle);
   const [activeBossShape, setActiveBossShape] = useState<BossShape | null>(null);
   const [locked, setLocked] = useState(false);
@@ -70,9 +75,11 @@ export function HostControlPanel() {
     [status, activeBossShape, waves, locked, winner],
   );
   const sessionRef = useRef(session);
-  const { publishState, pushReminder } = useGameChannel({
+  const { publishState, pushReminder, publishPhase } = useGameChannel({
     getStateForSync: () => sessionRef.current,
     onLeaderboard: setLiveScores,
+    onPhase: setPhase,
+    onPresence: setPlayerCount,
   });
   useEffect(() => {
     sessionRef.current = session;
@@ -150,6 +157,15 @@ export function HostControlPanel() {
     addLog("Reset to lobby", LogTone.Info);
   }
 
+  function handleSelectPhase(next: EventPhase) {
+    if (next === phase) return;
+    setPhase(next);
+    publishPhase(next);
+    const meta = PHASE_META[next];
+    toast(`Event: ${meta.label}`, { description: meta.description });
+    addLog(`Advanced event to ${meta.label}`, LogTone.Info);
+  }
+
   function handlePushReminder(reminder: HostReminder) {
     pushReminder(reminder.id);
     toast(reminder.label, { description: `Pushed to ${playerCount} attendees · ${reminder.detail}` });
@@ -158,6 +174,8 @@ export function HostControlPanel() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 px-4 py-5 sm:px-6">
+      <EventJourneyControl phase={phase} onSelectPhase={handleSelectPhase} />
+
       <HostStatusBanner
         status={status}
         controls={controls}

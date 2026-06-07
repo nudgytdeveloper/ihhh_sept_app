@@ -38,7 +38,8 @@ is nothing to configure and no accounts to create — just the URL.
 | 4 | Virus Fight Game | `/game/play` | **Attendees (play live)** |
 | 5 | Host Game Control Panel | `/host` | **Presenter (drives everything)** |
 
-The realtime link that matters for the live moment is **`/host` → `/game/play`**.
+The realtime links that matter: **`/host` → `/`** drives the event journey for
+every attendee, and **`/host` → `/game/play`** drives the live game.
 
 ---
 
@@ -46,23 +47,46 @@ The realtime link that matters for the live moment is **`/host` → `/game/play`
 
 ### Act 1 — The product story (Screen 1, ~2 min)
 
-Open **`/` (Navigator Home)** on a phone and mirror it for the room.
+Open **`/`** on a phone and mirror it for the room. The **first** time a device
+opens the app, Navi runs a quick **welcome**: she greets the attendee, shows the
+**seat she's auto-allocated** them, and asks for their name. Type a name and tap
+**Enter the event** — that name + seat now personalize the whole app (and become
+the attendee's handle on the live leaderboard). *(It's remembered per device, so
+you only do this once per phone.)*
 
 What to say: *"This isn't an ask-me-anything chatbot. It's an event host —
-**Navi** — who speaks first and always gives one clear next step."*
+**Navi** — who speaks first and always gives one clear next step. Notice she
+checked me in and gave me a seat before I asked anything."*
 
 What to show:
 - Navi's **scripted speech bubble** + the single **next-action CTA**.
 - The **phase journey** track (Registered → Seated → Opening → Game Session →
   Buffet → Closing) with "Now / Up next".
-- The **game preview card** (entry point + leaderboard peek — the game itself
-  lives on its own screen).
+- The **game preview card** (entry point + leaderboard peek + a live **"online"
+  count** of attendees connected right now — the game itself lives on its own
+  screen).
 - Tap the **speaker toggle** so Navi reads her line aloud — a nice "wow" beat.
 
 Optional: tap through to **`/schedule`** (Screen 2) to show the phase timeline,
 then **`/game/lobby`** (Screen 3) to show the "who's in" lobby and how-to-play.
 
-### Act 2 — Everyone joins the game (~1 min)
+### Act 2 — The host guides the journey (Screen 5 → Screen 1, ~1 min)
+
+This is the heart of the product: the host moves the whole room through the day,
+and Navi leads each attendee to the next step — no one taps around looking for
+what's next.
+
+On the presenter device at **`/host`**, find the **Event journey** control at the
+top. The journey starts at **phase 1 (Registered)**. Tap **Advance to Seated**
+(or jump to any phase chip) and watch the attendee phones: Navi's message, the
+**event-journey track**, and the **schedule** all update **live** — e.g. moving
+to *Seated* changes her line to *"Your seat is ready."* Walk the room from
+**Registered → Seated → Opening → Game Session**, narrating each handoff.
+
+> The phase is shared live over the same server, so every connected phone (and
+> any that join later) lands on the current phase automatically.
+
+### Act 3 — Everyone joins the game (~1 min)
 
 Ask the audience to open **`<your-url>/game/play`** on their phones (share the QR
 / link). Each phone shows the live round; when the host is connected they'll see
@@ -71,10 +95,12 @@ a **"Live · hosted from the control room"** badge.
 > No host action needed for them to join — the server replays the current
 > session to every phone the moment it connects, in any order.
 
-### Act 3 — The host drives the live game (Screen 5, ~3 min)
+### Act 4 — The host drives the live game (Screen 5, ~3 min)
 
-On the presenter device at **`/host`**, run this exact sequence and call out what
-the audience sees happen **on their own phones** in real time:
+With the journey now on **Game Session** (Act 2), stay on the presenter device at
+**`/host`** and run this exact sequence with the **game** controls below the
+Event journey card — call out what the audience sees happen **on their own
+phones** in real time:
 
 1. **Start round** — every phone drops into the live round; mini-viruses start
    floating. Attendees **tap viruses for points** (+10 each). The HUD shows live
@@ -183,17 +209,24 @@ before building — but for anything cross-device, **leave it on `sse`**.
 
 ## What's mock vs. live (be honest in the room)
 
-- **Live & cross-device:** host → attendee game control (start/boss/resume/end/
-  lock), reminders, the per-attendee round (tapping, boss draw, score, HUD), the
+- **Live & cross-device:** the **attendee persona** (name they enter at the
+  welcome step + auto-allocated seat + check-in), the **event journey phase**
+  (host-driven — advancing it updates every attendee's Navi, journey track, and
+  schedule live), host → attendee game control (start/boss/resume/end/lock),
+  reminders, the per-attendee round (tapping, boss draw, score, HUD), the
   **shared leaderboard** (every phone's score pools into one server-aggregated
-  board that re-ranks live, freezes on lock, and clears on reset), and Navi's
-  voice + scripted lines. Each device auto-picks a friendly handle (e.g. "Swift
-  Otter") so players are distinct on the board.
-- **Demo seed data:** the attendee's home/profile persona (name, seat, schedule)
-  and the home screen's leaderboard *peek* are still seeded mock content — they
-  set the scene but aren't wired to live state. The **host's** Live leaderboard
-  during the round is the real, shared one.
+  board that re-ranks live, freezes on lock, and clears on reset — shown on both
+  the host panel **and** the home screen's leaderboard peek), the **"online"
+  headcount** (a real count of connected attendee devices — server-tracked, the
+  host excluded — shown live on the home preview, the lobby, and the host panel;
+  it rises and falls as phones join and leave), and Navi's voice + scripted lines.
+  The entered name doubles as the player's leaderboard handle, so players are
+  distinct on the board.
+- **Demo seed data:** the **schedule times** (8:30 AM, 9:00 AM, …) are seeded,
+  and the home peek shows a small **sample top-3** only until real scores arrive
+  (then it flips to the live shared board).
 
-> Note: the shared leaderboard is server-aggregated, so it needs the SSE
-> transport (the default on Render and in local two-window dev). The optional
-> same-browser `broadcast` fallback has no server to pool scores.
+> Note: the shared leaderboard and the live headcount are both server-side, so
+> they need the SSE transport (the default on Render and in local two-window dev).
+> The optional same-browser `broadcast` fallback has no server to pool scores or
+> count attendees.

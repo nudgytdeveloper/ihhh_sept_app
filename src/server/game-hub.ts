@@ -1,5 +1,6 @@
 import { GameStatus, GAME_CONFIG } from "@/constants/game";
 import { RealtimeMessage } from "@/constants/realtime";
+import type { EventPhase } from "@/constants/phases";
 import type { GameSessionState, ScoreEntry } from "@/types";
 
 /**
@@ -18,18 +19,67 @@ type SseSend = (event: string, data: unknown) => void;
 
 const subscribers = new Set<SseSend>();
 let currentState: GameSessionState | null = null;
+/** The latest event journey phase the host has set, replayed on connect. */
+let currentPhase: EventPhase | null = null;
 /** Latest score per player (keyed by device playerId) — the shared board. */
 const scores = new Map<string, ScoreEntry>();
+/**
+ * Live presence: open SSE connections per distinct attendee device (keyed by
+ * playerId). Refcounted because one attendee can hold several connections at
+ * once (e.g. the navigator shell + the game screen, or two tabs); the headcount
+ * is the number of distinct keys. The host connects without a playerId, so it is
+ * never counted as an attendee.
+ */
+const presence = new Map<string, number>();
 
-/** Register a connected SSE client; returns an unsubscribe fn. */
-export function addSubscriber(send: SseSend): () => void {
+/**
+ * Register a connected SSE client; returns an unsubscribe fn. An attendee passes
+ * its device `playerId` so it is counted toward the live headcount (the host
+ * omits it). Distinct-count changes are fanned out to everyone.
+ */
+export function addSubscriber(send: SseSend, playerId?: string): () => void {
   subscribers.add(send);
-  return () => subscribers.delete(send);
+  const releasePresence = playerId ? acquirePresence(playerId) : () => {};
+  return () => {
+    subscribers.delete(send);
+    releasePresence();
+  };
+}
+
+/** The live count of distinct connected attendee devices, replayed on connect. */
+export function getPresenceCount(): number {
+  return presence.size;
+}
+
+/** Mark one connection present for a device; returns a release fn. Broadcasts on
+ *  distinct-count changes (first connection in / last connection out). */
+function acquirePresence(playerId: string): () => void {
+  const before = presence.get(playerId) ?? 0;
+  presence.set(playerId, before + 1);
+  if (before === 0) broadcastPresence();
+  return () => {
+    const current = presence.get(playerId) ?? 0;
+    if (current <= 1) {
+      presence.delete(playerId);
+      broadcastPresence();
+    } else {
+      presence.set(playerId, current - 1);
+    }
+  };
+}
+
+function broadcastPresence(): void {
+  broadcast(RealtimeMessage.Presence, { count: presence.size });
 }
 
 /** The latest host snapshot, replayed to each newly-connected client. */
 export function getCurrentState(): GameSessionState | null {
   return currentState;
+}
+
+/** The latest event journey phase, replayed to each newly-connected client. */
+export function getCurrentPhase(): EventPhase | null {
+  return currentPhase;
 }
 
 /** The current shared leaderboard (top N, highest first), replayed on connect. */
@@ -70,6 +120,12 @@ export function submitScore(entry: ScoreEntry): void {
     score: entry.score,
   });
   broadcast(RealtimeMessage.Leaderboard, getLeaderboard());
+}
+
+/** Host advanced the event journey → store it + fan out to everyone. */
+export function publishPhase(phase: EventPhase): void {
+  currentPhase = phase;
+  broadcast(RealtimeMessage.Phase, { phase });
 }
 
 /** Host pushed a one-off reminder → fan out (not stored). */

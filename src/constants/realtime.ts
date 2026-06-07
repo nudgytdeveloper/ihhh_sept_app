@@ -23,6 +23,10 @@ export enum RealtimeMessage {
   Score = "score",
   /** The server fanning out the aggregated shared leaderboard (server → all). */
   Leaderboard = "leaderboard",
+  /** Host driving the current event journey phase for every attendee. */
+  Phase = "phase",
+  /** The server fanning out the live count of connected attendees (server → all). */
+  Presence = "presence",
 }
 
 /** Available realtime transports (selected behind the GameChannel facade). */

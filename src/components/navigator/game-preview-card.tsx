@@ -24,15 +24,18 @@ const LIVE_STATUSES = new Set<GameStatus>([
 
 /**
  * Game session entry point for the navigator home. Previews the live Virus
- * Fight session (status, players, leaderboard peek) and routes to the lobby.
- * Intentionally NOT the game itself — that lives on /game/play.
+ * Fight session (status, who's online, leaderboard peek) and routes to the lobby.
+ * Intentionally NOT the game itself — that lives on /game/play. `playerCount` is
+ * the live count of connected attendees (server-tracked).
  */
 export function GamePreviewCard({
   game,
   leaderboard,
+  playerCount,
 }: {
   game: GameSession;
   leaderboard: LeaderboardEntry[];
+  playerCount: number;
 }) {
   const isLive = LIVE_STATUSES.has(game.status);
   const top = leaderboard.slice(0, 3);
@@ -63,7 +66,7 @@ export function GamePreviewCard({
 
         {/* Stats */}
         <div className="mt-4 grid grid-cols-3 gap-2">
-          <Stat icon={Users} value={`${game.playerCount}`} label="playing" />
+          <Stat icon={Users} value={`${playerCount}`} label="online" />
           <Stat
             icon={Timer}
             value={`${GAME_CONFIG.roundSeconds}s`}

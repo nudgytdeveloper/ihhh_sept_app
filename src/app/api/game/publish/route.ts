@@ -1,4 +1,4 @@
-import { publishReminder, publishState, submitScore } from "@/server/game-hub";
+import { publishPhase, publishReminder, publishState, submitScore } from "@/server/game-hub";
 import { RealtimeMessage } from "@/constants/realtime";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +20,8 @@ export async function POST(request: Request) {
     publishReminder(body.reminderId);
   } else if (body.type === RealtimeMessage.Score && body.entry) {
     submitScore(body.entry);
+  } else if (body.type === RealtimeMessage.Phase && typeof body.phase === "string") {
+    publishPhase(body.phase);
   } else {
     return Response.json({ ok: false, error: "unknown message" }, { status: 400 });
   }

@@ -9,18 +9,22 @@ import type { GameSession, LeaderboardEntry } from "@/types";
 
 /**
  * The energetic centerpiece of the lobby: game branding, live status, floating
- * mini-viruses, and a "who's in" player count with stacked avatars.
+ * mini-viruses, and a "who's in" headcount with stacked avatars. `playerCount` is
+ * the live count of connected attendees (server-tracked); the faces are capped to
+ * it so the avatars never outnumber the real headcount.
  */
 export function LobbyHero({
   game,
   players,
+  playerCount,
 }: {
   game: GameSession;
   players: LeaderboardEntry[];
+  playerCount: number;
 }) {
   const statusMeta = getGameStatusMeta(game.status);
-  const faces = players.slice(0, 5);
-  const extra = Math.max(game.playerCount - faces.length, 0);
+  const faces = players.slice(0, Math.min(5, playerCount));
+  const extra = Math.max(playerCount - faces.length, 0);
 
   return (
     <Card className="relative overflow-hidden rounded-3xl border-0 p-0 shadow-soft-lg">
@@ -66,9 +70,9 @@ export function LobbyHero({
           </div>
           <div className="leading-tight">
             <p className="font-mono text-xl font-bold leading-none">
-              {game.playerCount}
+              {playerCount}
             </p>
-            <p className={cn("text-xs text-white/85")}>players ready</p>
+            <p className={cn("text-xs text-white/85")}>online now</p>
           </div>
         </div>
       </div>

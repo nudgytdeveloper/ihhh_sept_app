@@ -1,4 +1,10 @@
-import { addSubscriber, getCurrentState, getLeaderboard } from "@/server/game-hub";
+import {
+  addSubscriber,
+  getCurrentPhase,
+  getCurrentState,
+  getLeaderboard,
+  getPresenceCount,
+} from "@/server/game-hub";
 import { RealtimeMessage } from "@/constants/realtime";
 
 export const dynamic = "force-dynamic";
@@ -6,9 +12,12 @@ export const runtime = "nodejs";
 
 /**
  * SSE stream for host + attendees: replays the current session to the new client,
- * then pushes live host updates (state / reminder) as named events.
+ * then pushes live host updates (state / reminder / presence) as named events.
+ * Attendees pass `?playerId=` so they are counted toward the live headcount; the
+ * host connects without one and is not counted.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const playerId = new URL(request.url).searchParams.get("playerId") ?? undefined;
   const encoder = new TextEncoder();
   let teardown = () => {};
 
@@ -18,13 +27,19 @@ export async function GET() {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       };
 
-      // Sync the newly-connected client with the current session + board, if any.
+      // Sync the newly-connected client with the current phase + session + board.
+      const phase = getCurrentPhase();
+      if (phase) send(RealtimeMessage.Phase, { phase });
       const current = getCurrentState();
       if (current) send(RealtimeMessage.State, current);
       const board = getLeaderboard();
       if (board.length > 0) send(RealtimeMessage.Leaderboard, board);
 
-      const remove = addSubscriber(send);
+      // Registers this device for presence (when it's an attendee) and broadcasts
+      // the change; then replay the current headcount so even a no-change join
+      // (e.g. a second tab of the same device) knows the count.
+      const remove = addSubscriber(send, playerId);
+      send(RealtimeMessage.Presence, { count: getPresenceCount() });
       // Heartbeat keeps the connection alive through proxies / load balancers.
       const ping = setInterval(() => {
         try {

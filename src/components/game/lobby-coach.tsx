@@ -1,15 +1,22 @@
+"use client";
+
 import { AvatarHost } from "@/components/navigator/avatar-host";
 import { AVATAR_NAME } from "@/constants/app";
 import { AvatarMood } from "@/constants/statuses";
+import { PLAYER_NAME_FALLBACK } from "@/constants/player";
 import { LOBBY_INTRO } from "@/constants/avatar-scripts";
 import { template } from "@/utils/format";
+import { usePlayerIdentity } from "@/utils/player-identity";
 
 /**
  * Compact Navi presence for the lobby — the host coaches the attendee before
- * the round (avatar leads, in keeping with the product direction).
+ * the round, greeting them by their onboarded name (avatar leads, in keeping
+ * with the product direction).
  */
-export function LobbyCoach({ name }: { name: string }) {
-  const line = template(LOBBY_INTRO, { name });
+export function LobbyCoach() {
+  const identity = usePlayerIdentity();
+  const firstName = (identity.name || PLAYER_NAME_FALLBACK).split(" ")[0];
+  const line = template(LOBBY_INTRO, { name: firstName });
 
   return (
     <div className="flex items-start gap-3">

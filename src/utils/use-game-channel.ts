@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { RealtimeMessage } from "@/constants/realtime";
 import { GameChannel } from "@/utils/realtime";
+import type { EventPhase } from "@/constants/phases";
 import type { GameSessionState, ScoreEntry } from "@/types";
 
 export interface GameChannelHandlers {
@@ -12,11 +13,21 @@ export interface GameChannelHandlers {
   onReminder?: (reminderId: string) => void;
   /** The aggregated shared leaderboard changed (from the server). */
   onLeaderboard?: (entries: ScoreEntry[]) => void;
+  /** The host advanced the event journey phase. */
+  onPhase?: (phase: EventPhase) => void;
+  /** The live count of connected attendees changed (from the server). */
+  onPresence?: (count: number) => void;
   /**
    * A late-joining attendee asked for the current snapshot. Host-only: return the
    * latest session to re-share it. Attendees omit this.
    */
   getStateForSync?: () => GameSessionState;
+  /**
+   * This device's player id (attendees only). Forwarded to the server so it is
+   * counted toward the live presence headcount; the host omits it. Changing it
+   * (e.g. once the persisted identity hydrates) reconnects the channel.
+   */
+  playerId?: string;
 }
 
 /**
@@ -29,6 +40,7 @@ export interface GameChannelHandlers {
 export function useGameChannel(handlers: GameChannelHandlers = {}) {
   const handlersRef = useRef(handlers);
   const channelRef = useRef<GameChannel | null>(null);
+  const playerId = handlers.playerId;
 
   // Keep the latest handlers without re-subscribing (refs are touched in effects,
   // never during render).
@@ -36,8 +48,10 @@ export function useGameChannel(handlers: GameChannelHandlers = {}) {
     handlersRef.current = handlers;
   });
 
+  // Re-runs only when playerId changes (e.g. "" → real id once identity hydrates),
+  // so the connection carries this device's id for the presence headcount.
   useEffect(() => {
-    const channel = new GameChannel();
+    const channel = new GameChannel(playerId);
     channelRef.current = channel;
 
     const unsubscribe = channel.subscribe((message) => {
@@ -48,6 +62,10 @@ export function useGameChannel(handlers: GameChannelHandlers = {}) {
         current.onReminder?.(message.reminderId);
       } else if (message.type === RealtimeMessage.Leaderboard) {
         current.onLeaderboard?.(message.entries);
+      } else if (message.type === RealtimeMessage.Phase) {
+        current.onPhase?.(message.phase);
+      } else if (message.type === RealtimeMessage.Presence) {
+        current.onPresence?.(message.count);
       } else if (message.type === RealtimeMessage.RequestState) {
         const snapshot = current.getStateForSync?.();
         if (snapshot) channel.publishState(snapshot);
@@ -62,7 +80,7 @@ export function useGameChannel(handlers: GameChannelHandlers = {}) {
       channel.close();
       channelRef.current = null;
     };
-  }, []);
+  }, [playerId]);
 
   const publishState = useCallback((state: GameSessionState) => {
     channelRef.current?.publishState(state);
@@ -76,5 +94,9 @@ export function useGameChannel(handlers: GameChannelHandlers = {}) {
     channelRef.current?.publishScore(entry);
   }, []);
 
-  return { publishState, pushReminder, publishScore };
+  const publishPhase = useCallback((phase: EventPhase) => {
+    channelRef.current?.publishPhase(phase);
+  }, []);
+
+  return { publishState, pushReminder, publishScore, publishPhase };
 }
