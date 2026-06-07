@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { AvatarHost } from "@/components/navigator/avatar-host";
@@ -7,6 +10,7 @@ import { AVATAR_NAME } from "@/constants/app";
 import { ActionIntent } from "@/constants/statuses";
 import type { AvatarScript } from "@/constants/avatar-scripts";
 import { template } from "@/utils/format";
+import { useNaviVoice } from "@/utils/navi-voice";
 
 /**
  * The hero of the navigator: the avatar host speaks first (scripted greeting +
@@ -22,6 +26,13 @@ export function NavigatorHero({
   const message = template(script.message, { name });
   const primary = script.action;
   const secondary = script.secondaryAction;
+
+  // When voice is on, Navi reads her current line (and re-reads it the moment
+  // the attendee enables voice). `speak` de-dupes, so this won't repeat itself.
+  const { enabled, speak } = useNaviVoice();
+  useEffect(() => {
+    if (enabled) speak(message);
+  }, [enabled, message, speak]);
 
   return (
     <section className="flex flex-col items-center text-center">

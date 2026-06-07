@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-07
+
+### Added
+- Shared live leaderboard: each attendee's score flows into one server-aggregated board that updates live on the Host Control Panel (Screen 5) — the host announces the winner from the real top scorer; the board freezes on lock and clears on reset
+- Per-device player identity (stable id + auto-generated handle like "Swift Otter", persisted to localStorage) so the shared leaderboard shows distinct players across phones — src/utils/player-identity.ts (usePlayerIdentity) + src/constants/player.ts
+- Score (attendee→server) + Leaderboard (server→all) realtime messages, the ScoreEntry type, and GameChannel.publishScore / useGameChannel onLeaderboard
+- Realtime host→attendee sync: the Host Control Panel (Screen 5) now drives the attendee Virus Fight game (Screen 4) live — unleash the COVID Boss with a chosen shape, resume the round, and end the game, with a "Live · hosted from the control room" badge on the attendee screen
+- Cross-device realtime over SSE: /api/game/stream (EventSource) + /api/game/publish route handlers backed by an in-memory server hub (src/server/game-hub.ts) — runs on a single server (Render-ready) so attendees on any device/network join over the public URL; no third-party realtime service
+- GameChannel transport facade (src/utils/realtime.ts) selects SSE (default, cross-device) or BroadcastChannel (same-browser local-dev fallback) via NEXT_PUBLIC_REALTIME_TRANSPORT; useGameChannel hook (src/utils/use-game-channel.ts) is unchanged for callers
+- Host-pushed reminders now surface as a toast + Navi voice line on any attendee screen (AttendeeRealtimeListener)
+- REALTIME_CHANNEL + RealtimeMessage + RealtimeTransport constants and SSE/publish path constants (src/constants/realtime.ts), the GameSessionState type, and .env.example documenting NEXT_PUBLIC_REALTIME_TRANSPORT
+- Navi voice via the Web Speech API: opt-in speaker toggle in the attendee header (persisted), Navi reads her scripted line on the home hero and calls out boss warning/defeat/escape/game-over + reminders during the game
+- Voice constants (src/constants/voice.ts: VOICE_CONFIG, VOICE_PREF, VOICE_STORAGE_KEY) + navi-voice util (speakLine, useNaviVoice; src/utils/navi-voice.ts)
+
+### Changed
+- Host leaderboard and the attendee in-round rank now read from the shared live board instead of mock data (the mock leaderboard remains only as a solo-play fallback for rank when no other players are present)
+
 ## 2026-06-04
 
 ### Added

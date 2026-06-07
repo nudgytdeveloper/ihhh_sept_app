@@ -1,4 +1,4 @@
-import { Trophy, Lock, Crown } from "lucide-react";
+import { Trophy, Lock, Crown, Users } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -47,7 +47,11 @@ export function HostLeaderboard({
           <Trophy className="size-4 text-amber-500" />
           Live leaderboard
         </CardTitle>
-        <CardDescription>{playerCount} players in this round</CardDescription>
+        <CardDescription>
+          {playerCount > 0
+            ? `${playerCount} ${playerCount === 1 ? "player" : "players"} on the board`
+            : "Live scores from attendees"}
+        </CardDescription>
         <CardAction>
           <Badge variant={locked ? "secondary" : "outline"} className="gap-1">
             <span
@@ -62,6 +66,15 @@ export function HostLeaderboard({
       </CardHeader>
 
       <CardContent className="space-y-0.5">
+        {leaderboard.length === 0 ? (
+          <div className="flex flex-col items-center gap-1.5 py-10 text-center">
+            <Users className="size-7 text-muted-foreground/50" />
+            <p className="text-sm font-medium">Waiting for players…</p>
+            <p className="max-w-[16rem] text-xs text-muted-foreground">
+              Scores appear here live as attendees tap viruses and beat the boss.
+            </p>
+          </div>
+        ) : null}
         {leaderboard.map((entry, i) => {
           const isWinner = winner ? winner.attendeeId === entry.attendeeId : false;
           return (

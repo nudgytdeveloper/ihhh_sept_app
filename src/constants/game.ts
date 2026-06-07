@@ -106,6 +106,8 @@ export const GAME_CONFIG = {
   bossResolveDelayMs: 1300,
   /** At/below this many seconds remaining, the timer reads as "low" (urgent). */
   lowTimeThresholdSeconds: 10,
+  /** How often an attendee flushes their score to the shared leaderboard, in ms. */
+  scoreSyncIntervalMs: 700,
 } as const;
 
 /** Display metadata for each game lifecycle state (reused across game screens). */

@@ -40,6 +40,17 @@ export interface LeaderboardEntry {
   isCurrentUser?: boolean;
 }
 
+/**
+ * A single player's live score, reported attendee → server over the realtime
+ * channel. The server aggregates these into the shared leaderboard it fans back
+ * out (see `@/server/game-hub`). Keyed by `playerId` (one per device).
+ */
+export interface ScoreEntry {
+  playerId: string;
+  name: string;
+  score: number;
+}
+
 /** Live game session state (host-controlled). */
 export interface GameSession {
   status: GameStatus;
@@ -58,6 +69,23 @@ export interface GameSession {
 export interface EventState {
   phase: EventPhase;
   game: GameSession;
+}
+
+/**
+ * The live session snapshot the host broadcasts to attendees over the realtime
+ * channel (see `@/utils/realtime`). Distinct from `GameSession` (the mock seed):
+ * this is what actually flows host → attendee at runtime to drive the game.
+ */
+export interface GameSessionState {
+  status: GameStatus;
+  /** Shape to draw while a boss is active, else null. */
+  requiredShape: BossShape | null;
+  /** Mini-virus waves the host has released this round. */
+  waves: number;
+  /** Whether the host has locked the leaderboard. */
+  locked: boolean;
+  /** Name of the announced winner, once the host announces one. */
+  winnerName: string | null;
 }
 
 /** A proactive nudge the avatar surfaces on the navigator home. */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Zap, Bell } from "lucide-react";
 import {
@@ -25,10 +25,11 @@ import {
   BOSS_NAME,
 } from "@/constants/game";
 import { LogTone, HOST_REMINDERS, type HostReminder } from "@/constants/host";
-import { getHostControls, getWinner } from "@/utils/game";
+import { getHostControls, getWinner, toLeaderboard } from "@/utils/game";
+import { useGameChannel } from "@/utils/use-game-channel";
 import { formatScore } from "@/utils/format";
-import { MOCK_EVENT_STATE, MOCK_LEADERBOARD } from "@/data/event";
-import type { LeaderboardEntry } from "@/types";
+import { MOCK_EVENT_STATE } from "@/data/event";
+import type { LeaderboardEntry, GameSessionState, ScoreEntry } from "@/types";
 
 /**
  * Screen 5 — Host Game Control Panel. The host runs the show: start/end the
@@ -46,10 +47,37 @@ export function HostControlPanel() {
   const [locked, setLocked] = useState(false);
   const [waves, setWaves] = useState(0);
   const [winner, setWinner] = useState<LeaderboardEntry | null>(null);
+  const [liveScores, setLiveScores] = useState<ScoreEntry[]>([]);
   const [log, setLog] = useState<LogEntry[]>([]);
 
   const logIdRef = useRef(0);
   const controls = getHostControls(status);
+
+  // The shared live leaderboard, aggregated server-side from every attendee's
+  // score (the host is not a player, so no row is flagged as the current user).
+  const leaderboard = toLeaderboard(liveScores, "");
+
+  // Broadcast the live session to attendees (Screen 4) over the realtime channel,
+  // and re-share it whenever a late-joining attendee asks (RequestState).
+  const session = useMemo<GameSessionState>(
+    () => ({
+      status,
+      requiredShape: activeBossShape,
+      waves,
+      locked,
+      winnerName: winner?.name ?? null,
+    }),
+    [status, activeBossShape, waves, locked, winner],
+  );
+  const sessionRef = useRef(session);
+  const { publishState, pushReminder } = useGameChannel({
+    getStateForSync: () => sessionRef.current,
+    onLeaderboard: setLiveScores,
+  });
+  useEffect(() => {
+    sessionRef.current = session;
+    publishState(session);
+  }, [session, publishState]);
 
   function addLog(message: string, tone: LogTone) {
     logIdRef.current += 1;
@@ -96,8 +124,11 @@ export function HostControlPanel() {
   }
 
   function handleAnnounce() {
-    const top = getWinner(MOCK_LEADERBOARD);
-    if (!top) return;
+    const top = getWinner(leaderboard);
+    if (!top) {
+      toast("No scores yet", { description: "Wait for attendees to play before announcing." });
+      return;
+    }
     setWinner(top);
     toast.success(`🏆 ${top.name} wins!`, { description: `${formatScore(top.score)} points` });
     addLog(`Announced winner: ${top.name} (${formatScore(top.score)} pts)`, LogTone.Success);
@@ -120,6 +151,7 @@ export function HostControlPanel() {
   }
 
   function handlePushReminder(reminder: HostReminder) {
+    pushReminder(reminder.id);
     toast(reminder.label, { description: `Pushed to ${playerCount} attendees · ${reminder.detail}` });
     addLog(`Pushed reminder: ${reminder.label}`, LogTone.Info);
   }
@@ -213,11 +245,11 @@ export function HostControlPanel() {
         {/* Leaderboard + activity rail */}
         <div className="flex flex-col gap-4">
           <HostLeaderboard
-            leaderboard={MOCK_LEADERBOARD}
+            leaderboard={leaderboard}
             locked={locked}
             controls={controls}
             winner={winner}
-            playerCount={playerCount}
+            playerCount={leaderboard.length}
             onLock={handleLock}
             onAnnounce={handleAnnounce}
           />

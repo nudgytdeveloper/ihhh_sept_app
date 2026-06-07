@@ -4,7 +4,8 @@ import {
   LOBBY_CTA,
   type GameStatusMeta,
 } from "@/constants/game";
-import type { LeaderboardEntry } from "@/types";
+import { getInitials } from "@/utils/format";
+import type { LeaderboardEntry, ScoreEntry } from "@/types";
 
 /** Display metadata for a game lifecycle state. */
 export function getGameStatusMeta(status: GameStatus): GameStatusMeta {
@@ -81,4 +82,35 @@ export function getHostControls(status: GameStatus): HostControls {
 /** The current leader (highest score) on a leaderboard. */
 export function getWinner(leaderboard: LeaderboardEntry[]): LeaderboardEntry | undefined {
   return [...leaderboard].sort((a, b) => b.score - a.score)[0];
+}
+
+/* ----------------------- Shared live leaderboard ------------------------ */
+
+/**
+ * Turn the server's aggregated score entries (already sorted desc) into display
+ * rows, numbering ranks and flagging the current device's own entry.
+ */
+export function toLeaderboard(entries: ScoreEntry[], currentPlayerId: string): LeaderboardEntry[] {
+  return entries.map((entry, index) => ({
+    rank: index + 1,
+    attendeeId: entry.playerId,
+    name: entry.name,
+    initials: getInitials(entry.name),
+    score: entry.score,
+    isCurrentUser: entry.playerId === currentPlayerId,
+  }));
+}
+
+/** Live rank for a score among the shared board: 1 + others scoring higher. */
+export function getRankAmong(score: number, entries: ScoreEntry[], playerId: string): number {
+  return 1 + entries.filter((entry) => entry.playerId !== playerId && entry.score > score).length;
+}
+
+/** How many other players on the shared board the given score is ahead of. */
+export function getPlayersBeatenAmong(
+  score: number,
+  entries: ScoreEntry[],
+  playerId: string,
+): number {
+  return entries.filter((entry) => entry.playerId !== playerId && entry.score < score).length;
 }

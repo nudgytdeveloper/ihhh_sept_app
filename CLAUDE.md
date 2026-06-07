@@ -84,9 +84,17 @@ point** — do **not** build the game UI there.
 - **lucide-react** icons
 - **sonner** for toasts (`<Toaster>` mounted in root layout)
 - Game rendering: **HTML Canvas or animated DOM elements** (TBD per screen)
-- Realtime / leaderboard: **Firebase / Supabase / Socket.io — TBD.** Mock data
-  is used for the demo (see `src/data/`). Visual polish > backend completeness.
-- Voice: optional; **text bubble first**.
+- Realtime: wired for the demo over the browser-native **BroadcastChannel**
+  (`src/utils/realtime.ts` `GameChannel` + `useGameChannel`) — the Host panel
+  drives the attendee game **live across tabs/windows**, zero backend. The
+  transport is abstracted behind `GameChannel`, so Socket.io / Supabase Realtime
+  can replace it later without touching screens. The **leaderboard is shared +
+  live** — server-aggregated from every attendee's reported score (the mock in
+  `src/data/` is only a solo-play rank fallback). Visual polish > backend
+  completeness.
+- Voice: **Navi speaks** her scripted lines via the Web Speech API — opt-in
+  speaker toggle, **off by default** (the text bubble still leads). See
+  `src/utils/navi-voice.ts`.
 
 ### Commands
 
@@ -147,9 +155,12 @@ src/
 │  │  └─ game/
 │  │     ├─ lobby/page.tsx    # Screen 3  (/game/lobby)
 │  │     └─ play/page.tsx     # Screen 4  (/game/play)
-│  └─ host/
-│     ├─ layout.tsx           # host control-room shell
-│     └─ page.tsx             # Screen 5  (/host)
+│  ├─ host/
+│  │  ├─ layout.tsx           # host control-room shell
+│  │  └─ page.tsx             # Screen 5  (/host)
+│  └─ api/game/               # realtime SSE endpoints (server route handlers)
+│     ├─ stream/route.ts      # SSE stream — host + attendees subscribe (state + leaderboard)
+│     └─ publish/route.ts     # host POSTs state/reminders; attendees POST scores (fan-out)
 ├─ components/
 │  ├─ ui/                     # shadcn/ui primitives
 │  └─ scaffold/               # dev placeholders (ScreenStub)
@@ -161,17 +172,26 @@ src/
 │  ├─ game.ts                 # GameStatus, BossShape, SHAPE_META, GAME_CONFIG, GAME_STATUS_META, RoundPhase, BossOutcome
 │  ├─ avatar-scripts.ts       # AVATAR_SCRIPTS + SCHEDULE_INTRO/LOBBY_INTRO/GAME_SCRIPTS (Script Engine)
 │  ├─ host.ts                 # HOST_REMINDERS, LogTone + LOG_TONE_DOT (host panel)
+│  ├─ realtime.ts             # REALTIME_CHANNEL, RealtimeMessage (State/Reminder/Score/Leaderboard), paths
+│  ├─ voice.ts                # VOICE_CONFIG, VOICE_PREF, VOICE_STORAGE_KEY (Navi voice)
+│  ├─ player.ts               # player identity: storage keys + handle word pools
 │  └─ index.ts                # barrel
 ├─ utils/                     # ⚠️ all reusable functions live here (see rules)
 │  ├─ format.ts               # formatCountdown, formatScore, getInitials, template
 │  ├─ event.ts                # phase helpers (getPhaseState…) + getAvatarScript
-│  ├─ game.ts                 # game/leaderboard/host helpers (getGameStatusMeta, getLiveRank, getHostControls…)
+│  ├─ game.ts                 # game/leaderboard/host helpers (getGameStatusMeta, getLiveRank, toLeaderboard, getRankAmong, getHostControls…)
 │  ├─ shape-detection.ts      # boss draw-to-defeat matcher (matchShape / classifyStroke)
+│  ├─ realtime.ts             # GameChannel — SSE / BroadcastChannel transport facade (swappable)
+│  ├─ use-game-channel.ts     # useGameChannel hook (publish state/score/reminder + subscribe)
+│  ├─ navi-voice.ts           # Web Speech API — speakLine + useNaviVoice store
+│  ├─ player-identity.ts      # per-device identity (usePlayerIdentity — useSyncExternalStore)
 │  └─ index.ts                # barrel
 ├─ lib/
 │  └─ utils.ts                # shadcn `cn()` helper ONLY (ecosystem convention)
+├─ server/                    # ⚠️ server-only (never imported by client / barrel)
+│  └─ game-hub.ts             # in-memory SSE pub/sub hub: host state + subscribers + aggregated leaderboard
 ├─ types/
-│  └─ index.ts                # shared TS types (Attendee, ScheduleItem, GameSession, …)
+│  └─ index.ts                # shared TS types (Attendee, ScheduleItem, GameSession, GameSessionState, ScoreEntry, …)
 └─ data/
    └─ event.ts                # mock demo data (attendee, schedule, leaderboard, state)
 ```
@@ -304,11 +324,101 @@ at `src/app/host/layout.tsx` (`max-w-5xl`, no ambient gradient). Verified
 end-to-end in headless Chrome (full Lobby → Active → Boss → Ended → Locked flow,
 winner announce, reminder toasts) at mobile (430px) + desktop with no overflow.
 
+## Realtime sync + Navi voice — wired
+
+Three post-demo extensions are now in place (realtime host→attendee control, a
+shared live leaderboard, and Navi voice).
+
+**Realtime (host drives attendees live, cross-device).** Screen 5 (`/host`) and
+Screen 4 (`/game/play`) sync over **Server-Sent Events** served by the app
+itself, so attendees on **any device / network** join over the public URL — runs
+on a **single server instance** (Render-ready), no third-party realtime service:
+
+- `src/server/game-hub.ts` — server-only in-memory hub: holds the latest host
+  `GameSessionState` + the set of connected SSE clients, fanning host updates out
+  to all of them. **Deliberately not under `/utils`** (that barrel is imported by
+  client components — this must never reach the client bundle). Single-instance;
+  swap the `Set`/state for Redis pub/sub if the Render service is ever scaled out.
+- `src/app/api/game/stream/route.ts` — the SSE endpoint. Replays the current
+  session **and the current leaderboard** to each newly-connected client, then
+  streams live `state` / `reminder` / `leaderboard` events (with a heartbeat).
+  `src/app/api/game/publish/route.ts` — the host POSTs state / reminders here and
+  attendees POST `score`; both are `runtime = "nodejs"`, `dynamic` (the 6 page
+  routes stay static).
+- `src/utils/realtime.ts` — `GameChannel`, a **transport facade**: picks
+  `SseTransport` (default, cross-device — EventSource in, `fetch` POST out) or
+  `BroadcastTransport` (same-browser, offline local-dev) via
+  `REALTIME_TRANSPORT` (`NEXT_PUBLIC_REALTIME_TRANSPORT`, default `sse`). Callers
+  don't care which is active. A real socket backend can still drop in here.
+- `src/utils/use-game-channel.ts` — `useGameChannel({ onState, onReminder,
+  getStateForSync })`. All inbound handling runs from message events (never
+  synchronously in an effect body), so handlers can `setState` freely.
+- The **host** broadcasts a `GameSessionState` snapshot on every change and
+  re-shares it when a late-joining attendee sends `RequestState` (handshake — so
+  tab open order doesn't matter). Reminders go out as one-off events.
+- The **attendee game** reacts to host commands by status *transition* (a
+  re-broadcast snapshot never double-fires): host unleashes the boss → drops into
+  the boss fight with the host's shape; host resumes → the boss slips away; host
+  ends/locks → the round wraps. A "Live · hosted from the control room" badge
+  shows when a host is connected, and the local auto-boss is suppressed (the host
+  drives it). With **no host connected**, the round still auto-runs standalone.
+- Reminders are received globally by `AttendeeRealtimeListener` (mounted in the
+  attendee shell), so a host nudge toasts + speaks on whatever screen the
+  attendee is on.
+
+**Shared live leaderboard (server-aggregated).** Scores actually flow across
+devices into one board the host shows on the big screen:
+
+- Each attendee device has a stable identity via `usePlayerIdentity()`
+  (`src/utils/player-identity.ts`): a persisted random id + a friendly
+  auto-generated handle (e.g. "Swift Otter") so the board shows distinct players.
+  Pools/keys live in `src/constants/player.ts`.
+- The attendee game flushes its score (throttled, `GAME_CONFIG.scoreSyncIntervalMs`)
+  as a `Score` message; `src/server/game-hub.ts` keeps the latest score per
+  `playerId`, recomputes the top-`leaderboardSize` board, and fans a `Leaderboard`
+  event out to everyone. The **server is the single source of truth** — it
+  ignores scores while the host has the board **locked**, and clears it when the
+  host opens a fresh round (Lobby/reset).
+- The **host** renders that live board via `toLeaderboard()` and announces the
+  winner from the real top scorer (`getWinner()`); the **attendee** HUD/summary
+  rank reads from the same board (`getRankAmong` / `getPlayersBeatenAmong`),
+  falling back to the mock competitors only for a solo run.
+- Aggregation is server-side, so it works over SSE (the default — Render **and**
+  local two-window dev). The same-browser `broadcast` fallback has no server to
+  aggregate, so the shared board is an SSE-mode feature.
+
+**Navi voice (Web Speech API).** Opt-in, **off by default** (the text bubble
+still leads). A speaker toggle (`NaviVoiceToggle`) sits in the attendee header
+and persists the preference to localStorage:
+
+- `src/utils/navi-voice.ts` — `speakLine` (de-dupes the current line, never
+  queues) + a tiny `useSyncExternalStore`-backed store so the header toggle and
+  the speaking screens share one source of truth across route changes.
+  `src/constants/voice.ts` holds `VOICE_CONFIG` / `VOICE_PREF`.
+- Navi reads her scripted line on the home hero (re-reads it the moment voice is
+  enabled) and calls out the boss warning / defeat / escape / game-over and host
+  reminders during the game.
+
+Verified against a production server (`next start`) in headless Chrome with two
+**isolated browser contexts** (which can't share BroadcastChannel — so the sync
+is provably the SSE server): the host's "Start round" → "Spawn boss (Circle)" lit
+up the boss + draw prompt + toast on the attendee, "End game" rolled it to the
+summary, tapping a virus scored +10, no console errors, no overflow at 430px.
+The **shared leaderboard** was verified the same way: an attendee ("Lucky Panda")
+tapped to a score in one isolated context and that exact handle + score rendered
+on the host's live board in the other, then "Announce winner" crowned the real
+scorer. Server transport unit-tested too (live relay, replay-on-connect, reminder
+fan-out, and leaderboard: aggregation, live re-rank, replay-on-connect,
+lock-freeze, reset-clear, 400 on bad payload). **To demo cross-device, deploy
+to Render and open `/host` on the presenter's device and `/game/play` on each
+attendee's phone** (any network). Locally, two browser windows work the same.
+
 ## Status — demo complete 🎉
 
-All **5 demo screens are built** (see the scope table above). `ScreenStub`
-(`src/components/scaffold`) is now unused — keep it for any future scaffolding.
-Remaining polish/extension ideas (not yet requested): wire a shared realtime
-backend so the Host panel (Screen 5) actually drives the attendee game
-(Screen 4) live, add voice to Navi, and flesh out the remaining (post-demo)
-modules beyond these 5.
+All **5 demo screens are built** (see the scope table above), plus **cross-device
+realtime** host→attendee sync (SSE, Render-ready), a **shared live leaderboard**
+(server-aggregated), and Navi voice (above). `ScreenStub`
+(`src/components/scaffold`) is unused — keep it for any future scaffolding.
+Remaining ideas (not yet requested): multi-instance scaling (swap the in-memory
+hub for Redis pub/sub behind the same `GameChannel` seam), persisting the board
+across server restarts, and the remaining (post-demo) modules beyond these 5.

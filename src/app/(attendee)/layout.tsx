@@ -1,5 +1,7 @@
 import { Compass } from "lucide-react";
 import { APP_NAME, EVENT_NAME, EVENT_VENUE } from "@/constants/app";
+import { NaviVoiceToggle } from "@/components/navigator/navi-voice-toggle";
+import { AttendeeRealtimeListener } from "@/components/navigator/attendee-realtime-listener";
 
 /**
  * Shell for all attendee-facing screens: soft ambient backdrop, branded
@@ -23,11 +25,17 @@ export default function AttendeeLayout({
               <p className="text-xs text-muted-foreground">{EVENT_NAME}</p>
             </div>
           </div>
-          <p className="hidden text-right text-xs text-muted-foreground sm:block">
-            {EVENT_VENUE}
-          </p>
+          <div className="flex items-center gap-1.5">
+            <p className="hidden text-right text-xs text-muted-foreground sm:block">
+              {EVENT_VENUE}
+            </p>
+            <NaviVoiceToggle />
+          </div>
         </div>
       </header>
+
+      {/* Listens for host-pushed reminders on any attendee screen. */}
+      <AttendeeRealtimeListener />
 
       <main className="mx-auto flex w-full max-w-lg flex-1 flex-col">
         {children}
