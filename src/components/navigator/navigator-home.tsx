@@ -1,0 +1,72 @@
+"use client";
+
+import { Reveal } from "@/components/navigator/reveal";
+import { NavigatorHero } from "@/components/navigator/navigator-hero";
+import { PhaseProgress } from "@/components/navigator/phase-progress";
+import { GamePreviewCard } from "@/components/navigator/game-preview-card";
+import { StatusCard } from "@/components/navigator/status-card";
+import { RemindersCard } from "@/components/navigator/reminders-card";
+import {
+  useEventPhase,
+  useLiveLeaderboard,
+  usePlayerCount,
+} from "@/components/navigator/attendee-shell";
+import { getAvatarScript } from "@/utils/event";
+import { toLeaderboard } from "@/utils/game";
+import { attendeeFromIdentity, usePlayerIdentity } from "@/utils/player-identity";
+import { MOCK_EVENT_STATE, MOCK_LEADERBOARD, MOCK_REMINDERS } from "@/data/event";
+
+/** Idle teaser for the leaderboard peek before any live scores arrive (no "You"). */
+const SAMPLE_LEADERBOARD = MOCK_LEADERBOARD.map((entry) => ({
+  ...entry,
+  isCurrentUser: false,
+}));
+
+/**
+ * Screen 1 — Attendee Navigator Home. The avatar host leads with a single next
+ * action; the event journey, status, and reminders follow. Both the persona
+ * (name + seat, from the onboarded identity) and the current phase (host-driven,
+ * live over the realtime channel) are real — the game preview stays a mock peek.
+ */
+export function NavigatorHome() {
+  const phase = useEventPhase();
+  const identity = usePlayerIdentity();
+  const liveScores = useLiveLeaderboard();
+  const playerCount = usePlayerCount();
+  const attendee = attendeeFromIdentity(identity);
+  const firstName = attendee.name.split(" ")[0];
+  const script = getAvatarScript(phase);
+  const { game } = MOCK_EVENT_STATE;
+
+  // The peek shows the real shared board once scores arrive; until then a sample.
+  const leaderboard =
+    liveScores.length > 0 ? toLeaderboard(liveScores, identity.id) : SAMPLE_LEADERBOARD;
+
+  // Live count of connected attendees; this device is always at least 1 (and over
+  // the same-browser fallback, which can't aggregate, it's the only count we have).
+  const onlineCount = Math.max(playerCount, 1);
+
+  return (
+    <div className="flex flex-1 flex-col gap-4 px-4 pb-12 pt-6">
+      <Reveal delay={0}>
+        <NavigatorHero script={script} name={firstName} />
+      </Reveal>
+
+      <Reveal delay={90}>
+        <PhaseProgress phase={phase} />
+      </Reveal>
+
+      <Reveal delay={180}>
+        <GamePreviewCard game={game} leaderboard={leaderboard} playerCount={onlineCount} />
+      </Reveal>
+
+      <Reveal delay={270}>
+        <StatusCard attendee={attendee} />
+      </Reveal>
+
+      <Reveal delay={360}>
+        <RemindersCard reminders={MOCK_REMINDERS} />
+      </Reveal>
+    </div>
+  );
+}
