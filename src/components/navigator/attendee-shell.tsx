@@ -5,12 +5,13 @@ import { toast } from "sonner";
 import { AvatarHost } from "@/components/navigator/avatar-host";
 import { WelcomeGate } from "@/components/navigator/welcome-gate";
 import { EventPhase, PHASE_ORDER } from "@/constants/phases";
+import { GameStatus } from "@/constants/game";
 import { AvatarMood } from "@/constants/statuses";
 import { HOST_REMINDERS } from "@/constants/host";
 import { useGameChannel } from "@/utils/use-game-channel";
 import { usePlayerIdentity } from "@/utils/player-identity";
 import { speakLine } from "@/utils/navi-voice";
-import type { ScoreEntry } from "@/types";
+import type { GameSessionState, ScoreEntry } from "@/types";
 
 /**
  * Live event phase for the attendee area, driven by the host over the realtime
@@ -24,9 +25,21 @@ const LiveLeaderboardContext = createContext<ScoreEntry[]>([]);
 /** Live count of connected attendee devices (server-tracked), 0 until known. */
 const PlayerCountContext = createContext<number>(0);
 
+/**
+ * Live host-driven game status. Defaults to Idle (not started → not joinable)
+ * until a host session snapshot arrives, so the game entry stays gated when no
+ * host is running a round.
+ */
+const GameStatusContext = createContext<GameStatus>(GameStatus.Idle);
+
 /** The current host-driven event journey phase (read by the navigator screens). */
 export function useEventPhase(): EventPhase {
   return useContext(EventPhaseContext);
+}
+
+/** The live host-driven game status (gates entry into the live round). */
+export function useGameStatus(): GameStatus {
+  return useContext(GameStatusContext);
 }
 
 /** The shared live leaderboard (read by the home game-preview peek). */
@@ -53,10 +66,12 @@ export function usePlayerCount(): number {
 export function AttendeeShell({ children }: { children: React.ReactNode }) {
   const identity = usePlayerIdentity();
   const [phase, setPhase] = useState<EventPhase>(PHASE_ORDER[0]);
+  const [gameStatus, setGameStatus] = useState<GameStatus>(GameStatus.Idle);
   const [liveScores, setLiveScores] = useState<ScoreEntry[]>([]);
   const [playerCount, setPlayerCount] = useState(0);
 
   const onPhase = useCallback((next: EventPhase) => setPhase(next), []);
+  const onState = useCallback((state: GameSessionState) => setGameStatus(state.status), []);
   const onLeaderboard = useCallback((entries: ScoreEntry[]) => setLiveScores(entries), []);
   const onPresence = useCallback((count: number) => setPlayerCount(count), []);
   const onReminder = useCallback((reminderId: string) => {
@@ -72,6 +87,7 @@ export function AttendeeShell({ children }: { children: React.ReactNode }) {
   useGameChannel({
     playerId: identity.id || undefined,
     onPhase,
+    onState,
     onReminder,
     onLeaderboard,
     onPresence,
@@ -81,17 +97,19 @@ export function AttendeeShell({ children }: { children: React.ReactNode }) {
 
   return (
     <EventPhaseContext.Provider value={phase}>
-      <LiveLeaderboardContext.Provider value={liveScores}>
-        <PlayerCountContext.Provider value={playerCount}>
-          {!loaded ? (
-            <ShellSplash />
-          ) : !identity.onboarded ? (
-            <WelcomeGate />
-          ) : (
-            children
-          )}
-        </PlayerCountContext.Provider>
-      </LiveLeaderboardContext.Provider>
+      <GameStatusContext.Provider value={gameStatus}>
+        <LiveLeaderboardContext.Provider value={liveScores}>
+          <PlayerCountContext.Provider value={playerCount}>
+            {!loaded ? (
+              <ShellSplash />
+            ) : !identity.onboarded ? (
+              <WelcomeGate />
+            ) : (
+              children
+            )}
+          </PlayerCountContext.Provider>
+        </LiveLeaderboardContext.Provider>
+      </GameStatusContext.Provider>
     </EventPhaseContext.Provider>
   );
 }

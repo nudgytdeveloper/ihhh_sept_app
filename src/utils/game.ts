@@ -4,6 +4,7 @@ import {
   LOBBY_CTA,
   type GameStatusMeta,
 } from "@/constants/game";
+import { EventPhase } from "@/constants/phases";
 import { getInitials } from "@/utils/format";
 import type { LeaderboardEntry, ScoreEntry } from "@/types";
 
@@ -27,6 +28,55 @@ export function getLobbyCtaLabel(status: GameStatus): string {
   if (isGameJoinable(status)) return LOBBY_CTA.live;
   if (isGameOver(status)) return LOBBY_CTA.ended;
   return LOBBY_CTA.waiting;
+}
+
+/**
+ * The single gate for entering the live round. Both must hold: the event journey
+ * is at the Game Session phase AND the host has a live round running (Active /
+ * Boss fight). Gates the lobby "join" CTA and the /game/play screen so attendees
+ * can't drop into a round the host hasn't started — or has already ended.
+ */
+export function canEnterGame(phase: EventPhase, status: GameStatus): boolean {
+  return phase === EventPhase.GameSession && isGameJoinable(status);
+}
+
+/** Attendee-facing copy for the locked round (lobby CTA + /game/play gate). */
+export interface GameGateReason {
+  /** Headline for the locked state. */
+  title: string;
+  /** One-line explanation under the headline. */
+  description: string;
+  /** Disabled-CTA label for the lobby action bar. */
+  ctaLabel: string;
+}
+
+/**
+ * Why the live round can't be entered, with copy. Only meaningful when
+ * `canEnterGame` is false; covers the three blocked cases — the journey hasn't
+ * reached the Game Session phase, the host hasn't started the round yet, or the
+ * round has already wrapped.
+ */
+export function getGameGateReason(phase: EventPhase, status: GameStatus): GameGateReason {
+  if (phase !== EventPhase.GameSession) {
+    return {
+      title: "It's not game time just yet",
+      description: "Navi will call you in when the Game Session begins — hang tight!",
+      ctaLabel: "Not game time yet",
+    };
+  }
+  if (isGameOver(status)) {
+    return {
+      title: "That round has wrapped",
+      description: "The game session is over — check out the final leaderboard.",
+      ctaLabel: "Game over",
+    };
+  }
+  // Game Session phase, but the host hasn't started the round yet (Idle / Lobby).
+  return {
+    title: "Waiting for the host to start",
+    description: "The lobby is open — the round will kick off any moment now.",
+    ctaLabel: "Waiting for the host…",
+  };
 }
 
 /** Other players on the board (the current user's static entry is excluded). */

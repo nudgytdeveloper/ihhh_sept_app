@@ -2,7 +2,12 @@
 
 ## 2026-06-08
 
+### Fixed
+- Attendees could enter the live game round before the host started it or after it ended — entering /game/play (and the lobby "Join the round now" CTA) is now gated on canEnterGame: the event journey must be at the Game Session phase AND the host must have a live round running (Active / Boss); otherwise a Navi-led GameLocked screen / disabled CTA explains why and points back to the lobby
+- Game Lobby and the home game-preview card now reflect the live host game status instead of the static mock seed (the "Live" badge no longer shows when no round is running)
+
 ### Added
+- canEnterGame(phase, status) + getGameGateReason() gate helpers (src/utils/game.ts), a live useGameStatus() context on AttendeeShell (subscribes to host onState), and a GameScreen entry gate (src/components/game/game-screen.tsx) + GameLocked placeholder that wrap Screen 4; entry is latched so a mid-round host-end still shows the in-game summary
 - Optional human voice for Navi via ElevenLabs cloud TTS: a server-only /api/voice route proxies scripted lines to ElevenLabs with the secret key (in-memory clip cache; runtime=nodejs), gated behind NEXT_PUBLIC_VOICE_PROVIDER=elevenlabs — Navi falls back to the free Web Speech voice automatically when no key is configured or a request fails
 - VoiceProvider enum + VOICE_PROVIDER / VOICE_API_PATH / ELEVENLABS_CONFIG constants (src/constants/voice.ts) and an isVoiceSupported() helper; .env.example documents NEXT_PUBLIC_VOICE_PROVIDER + the server-only ELEVENLABS_API_KEY / ELEVENLABS_VOICE_ID
 

@@ -8,6 +8,7 @@ import { StatusCard } from "@/components/navigator/status-card";
 import { RemindersCard } from "@/components/navigator/reminders-card";
 import {
   useEventPhase,
+  useGameStatus,
   useLiveLeaderboard,
   usePlayerCount,
 } from "@/components/navigator/attendee-shell";
@@ -30,13 +31,15 @@ const SAMPLE_LEADERBOARD = MOCK_LEADERBOARD.map((entry) => ({
  */
 export function NavigatorHome() {
   const phase = useEventPhase();
+  const gameStatus = useGameStatus();
   const identity = usePlayerIdentity();
   const liveScores = useLiveLeaderboard();
   const playerCount = usePlayerCount();
   const attendee = attendeeFromIdentity(identity);
   const firstName = attendee.name.split(" ")[0];
   const script = getAvatarScript(phase);
-  const { game } = MOCK_EVENT_STATE;
+  // The preview's live badge reflects the real host status, not the mock seed.
+  const game = { ...MOCK_EVENT_STATE.game, status: gameStatus };
 
   // The peek shows the real shared board once scores arrive; until then a sample.
   const leaderboard =
