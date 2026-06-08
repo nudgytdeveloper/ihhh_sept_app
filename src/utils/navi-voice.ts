@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
-import { VOICE_CONFIG, VOICE_PREF, VOICE_STORAGE_KEY } from "@/constants/voice";
+import {
+  VOICE_CONFIG,
+  VOICE_PREF,
+  VOICE_STORAGE_KEY,
+  VOICE_PROVIDER,
+  VoiceProvider,
+  VOICE_API_PATH,
+} from "@/constants/voice";
 
 /* ----------------------------- low-level speech ---------------------------- */
 
@@ -26,23 +33,38 @@ function pickVoice(): SpeechSynthesisVoice | null {
   );
 }
 
-/** Stop any in-progress speech immediately. */
+/** A cloud-voice (ElevenLabs) clip currently playing, if any. */
+let currentAudio: HTMLAudioElement | null = null;
+/** Cache of already-fetched cloud clips: text → object URL (Navi's lines repeat). */
+const audioCache = new Map<string, string>();
+
+/** Stop the cloud-voice clip, if one is playing. */
+function stopAudio(): void {
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+}
+
+/** Stop any in-progress speech (Web Speech utterance or cloud clip) immediately. */
 export function cancelSpeech(): void {
   if (isSpeechSupported()) window.speechSynthesis.cancel();
+  stopAudio();
+}
+
+/** Whether Navi can speak at all with the active provider. */
+export function isVoiceSupported(): boolean {
+  if (typeof window === "undefined") return false;
+  // The cloud provider plays MP3 via <audio>, which every browser supports.
+  if (VOICE_PROVIDER === VoiceProvider.ElevenLabs) return true;
+  return isSpeechSupported();
 }
 
 let lastSpoken = "";
 
-/**
- * Speak a line as Navi — but only when voice is enabled. De-duplicates the most
- * recent line so repeated renders of the same text don't stack utterances, and
- * never queues (the host speaks one current line at a time).
- */
-export function speakLine(text: string): void {
-  if (!voiceEnabled || !text || !isSpeechSupported()) return;
-  if (text === lastSpoken) return;
-  lastSpoken = text;
-
+/** Speak a line with the free, device-native Web Speech API. */
+function speakViaWebSpeech(text: string): void {
+  if (!isSpeechSupported()) return;
   const synth = window.speechSynthesis;
   synth.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
@@ -53,6 +75,55 @@ export function speakLine(text: string): void {
   utterance.pitch = VOICE_CONFIG.pitch;
   utterance.volume = VOICE_CONFIG.volume;
   synth.speak(utterance);
+}
+
+/**
+ * Speak a line with the ElevenLabs cloud voice (natural/human). Fetches the MP3
+ * from our server route (which holds the secret key), caches it by text, and
+ * plays it. Falls back to the Web Speech voice on any failure — no key, network
+ * error, or autoplay block — so Navi always has a voice.
+ */
+async function speakViaCloud(text: string): Promise<void> {
+  try {
+    let url = audioCache.get(text);
+    if (!url) {
+      const res = await fetch(VOICE_API_PATH, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) throw new Error(`voice route ${res.status}`);
+      url = URL.createObjectURL(await res.blob());
+      audioCache.set(text, url);
+    }
+    // The attendee may have toggled voice off or moved to a new line while the
+    // clip was fetching — don't play a stale one.
+    if (!voiceEnabled || text !== lastSpoken) return;
+    stopAudio();
+    const audio = new Audio(url);
+    currentAudio = audio;
+    await audio.play();
+  } catch {
+    // Anything goes wrong → fall back to the always-available browser voice.
+    if (voiceEnabled && text === lastSpoken) speakViaWebSpeech(text);
+  }
+}
+
+/**
+ * Speak a line as Navi — but only when voice is enabled. De-duplicates the most
+ * recent line so repeated renders of the same text don't stack utterances, and
+ * never queues (the host speaks one current line at a time). Routes to the
+ * configured provider: the cloud ElevenLabs voice, else the browser voice.
+ */
+export function speakLine(text: string): void {
+  if (!voiceEnabled || !text) return;
+  if (text === lastSpoken) return;
+  lastSpoken = text;
+  if (VOICE_PROVIDER === VoiceProvider.ElevenLabs) {
+    void speakViaCloud(text);
+  } else {
+    speakViaWebSpeech(text);
+  }
 }
 
 /* ------------------------------- enabled store ----------------------------- */
@@ -130,7 +201,7 @@ export function useNaviVoice(): NaviVoice {
   const enabled = useSyncExternalStore(subscribeEnabled, getEnabledSnapshot, getServerSnapshot);
   // Support is false during SSR/hydration, then resolves on the client — no
   // mismatch, since useSyncExternalStore re-reads after hydration.
-  const supported = useSyncExternalStore(noopSubscribe, isSpeechSupported, getServerSnapshot);
+  const supported = useSyncExternalStore(noopSubscribe, isVoiceSupported, getServerSnapshot);
 
   useEffect(() => {
     initVoiceFromStorage();

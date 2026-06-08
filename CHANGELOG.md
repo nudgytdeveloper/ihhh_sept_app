@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-08
+
+### Added
+- Optional human voice for Navi via ElevenLabs cloud TTS: a server-only /api/voice route proxies scripted lines to ElevenLabs with the secret key (in-memory clip cache; runtime=nodejs), gated behind NEXT_PUBLIC_VOICE_PROVIDER=elevenlabs — Navi falls back to the free Web Speech voice automatically when no key is configured or a request fails
+- VoiceProvider enum + VOICE_PROVIDER / VOICE_API_PATH / ELEVENLABS_CONFIG constants (src/constants/voice.ts) and an isVoiceSupported() helper; .env.example documents NEXT_PUBLIC_VOICE_PROVIDER + the server-only ELEVENLABS_API_KEY / ELEVENLABS_VOICE_ID
+
+### Changed
+- navi-voice util now routes speakLine() to the configured provider (ElevenLabs MP3 playback via the server route, else the browser voice), caches fetched clips by text, and stops in-flight audio on cancel
+
 ## 2026-06-07
 
 ### Added

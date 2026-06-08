@@ -92,8 +92,11 @@ point** — do **not** build the game UI there.
   live** — server-aggregated from every attendee's reported score (the mock in
   `src/data/` is only a solo-play rank fallback). Visual polish > backend
   completeness.
-- Voice: **Navi speaks** her scripted lines via the Web Speech API — opt-in
-  speaker toggle, **off by default** (the text bubble still leads). See
+- Voice: **Navi speaks** her scripted lines — opt-in speaker toggle, **off by
+  default** (the text bubble still leads). Default engine is the free **Web
+  Speech API** (robotic); set `NEXT_PUBLIC_VOICE_PROVIDER=elevenlabs` +
+  server-only `ELEVENLABS_API_KEY` to upgrade to a natural **ElevenLabs** voice
+  (proxied by `/api/voice`), with automatic Web-Speech fallback. See
   `src/utils/navi-voice.ts`.
 
 ### Commands
@@ -158,9 +161,11 @@ src/
 │  ├─ host/
 │  │  ├─ layout.tsx           # host control-room shell
 │  │  └─ page.tsx             # Screen 5  (/host)
-│  └─ api/game/               # realtime SSE endpoints (server route handlers)
-│     ├─ stream/route.ts      # SSE stream — host + attendees subscribe (phase + state + leaderboard + presence); attendees pass ?playerId for the headcount
-│     └─ publish/route.ts     # host POSTs phase/state/reminders; attendees POST scores (fan-out)
+│  └─ api/
+│     ├─ game/                # realtime SSE endpoints (server route handlers)
+│     │  ├─ stream/route.ts   # SSE stream — host + attendees subscribe (phase + state + leaderboard + presence); attendees pass ?playerId for the headcount
+│     │  └─ publish/route.ts  # host POSTs phase/state/reminders; attendees POST scores (fan-out)
+│     └─ voice/route.ts       # Navi cloud TTS: POST a line → ElevenLabs (server-only key) → MP3; cached, 501 when unconfigured
 ├─ components/
 │  ├─ ui/                     # shadcn/ui primitives
 │  └─ scaffold/               # dev placeholders (ScreenStub)
@@ -173,7 +178,7 @@ src/
 │  ├─ avatar-scripts.ts       # AVATAR_SCRIPTS + SCHEDULE_INTRO/LOBBY_INTRO/GAME_SCRIPTS (Script Engine)
 │  ├─ host.ts                 # HOST_REMINDERS, LogTone + LOG_TONE_DOT (host panel)
 │  ├─ realtime.ts             # REALTIME_CHANNEL, RealtimeMessage (State/Reminder/Score/Leaderboard/Phase/Presence), paths
-│  ├─ voice.ts                # VOICE_CONFIG, VOICE_PREF, VOICE_STORAGE_KEY (Navi voice)
+│  ├─ voice.ts                # VOICE_CONFIG, VOICE_PREF, VOICE_STORAGE_KEY + VoiceProvider, VOICE_PROVIDER, VOICE_API_PATH, ELEVENLABS_CONFIG (Navi voice)
 │  ├─ player.ts               # attendee identity: storage keys, handle pools, seat-allocation pools
 │  └─ index.ts                # barrel
 ├─ utils/                     # ⚠️ all reusable functions live here (see rules)
@@ -183,7 +188,7 @@ src/
 │  ├─ shape-detection.ts      # boss draw-to-defeat matcher (matchShape / classifyStroke)
 │  ├─ realtime.ts             # GameChannel — SSE / BroadcastChannel transport facade (swappable)
 │  ├─ use-game-channel.ts     # useGameChannel hook (publish state/score/reminder/phase + subscribe state/leaderboard/phase/presence; passes playerId)
-│  ├─ navi-voice.ts           # Web Speech API — speakLine + useNaviVoice store
+│  ├─ navi-voice.ts           # speakLine (ElevenLabs /api/voice → MP3, else Web Speech; auto-fallback) + useNaviVoice store
 │  ├─ player-identity.ts      # per-device identity (usePlayerIdentity, completeOnboarding, attendeeFromIdentity)
 │  └─ index.ts                # barrel
 ├─ lib/
@@ -447,17 +452,31 @@ connected attendee devices, not a seed:
 - Like the shared board, presence is server-side, so it's an SSE-mode feature; the
   same-browser `broadcast` fallback has no server to count (stays at the local 1).
 
-**Navi voice (Web Speech API).** Opt-in, **off by default** (the text bubble
-still leads). A speaker toggle (`NaviVoiceToggle`) sits in the attendee header
-and persists the preference to localStorage:
+**Navi voice (Web Speech API + optional ElevenLabs).** Opt-in, **off by
+default** (the text bubble still leads). A speaker toggle (`NaviVoiceToggle`)
+sits in the attendee header and persists the preference to localStorage:
 
 - `src/utils/navi-voice.ts` — `speakLine` (de-dupes the current line, never
   queues) + a tiny `useSyncExternalStore`-backed store so the header toggle and
   the speaking screens share one source of truth across route changes.
-  `src/constants/voice.ts` holds `VOICE_CONFIG` / `VOICE_PREF`.
+  `src/constants/voice.ts` holds `VOICE_CONFIG` / `VOICE_PREF` + the provider
+  config (`VoiceProvider`, `VOICE_PROVIDER`, `VOICE_API_PATH`, `ELEVENLABS_CONFIG`).
 - Navi reads her scripted line on the home hero (re-reads it the moment voice is
   enabled) and calls out the boss warning / defeat / escape / game-over and host
   reminders during the game.
+- **Voice engine (default Web Speech, opt-in ElevenLabs).** By default `speakLine`
+  uses the free browser **Web Speech API** — zero setup, but robotic and
+  device-dependent. Set `NEXT_PUBLIC_VOICE_PROVIDER=elevenlabs` (build-time
+  client switch) **and** the server-only `ELEVENLABS_API_KEY` (+ optional
+  `ELEVENLABS_VOICE_ID`) to give Navi a natural **ElevenLabs** voice: the client
+  POSTs each line to **`/api/voice`** (`src/app/api/voice/route.ts`,
+  `runtime=nodejs`), which calls ElevenLabs with the secret key (kept server-side
+  only) and returns MP3. The route caches clips in memory (Navi's lines are
+  scripted + repeat), and the client caches fetched clips by text. **Graceful
+  fallback:** no key (route returns 501), a failed request, or a blocked autoplay
+  all fall back to the Web Speech voice, so Navi always speaks. The same-page
+  toggle/de-dupe/`cancelSpeech` behavior is unchanged; `isVoiceSupported()` is
+  true whenever the cloud provider is active (MP3 `<audio>` is universal).
 
 Verified against a production server (`next start`) in headless Chrome with two
 **isolated browser contexts** (which can't share BroadcastChannel — so the sync
