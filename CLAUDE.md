@@ -230,8 +230,10 @@ src/
 **Attendee Navigator Home** is implemented at `src/app/(attendee)/page.tsx`,
 composed from `src/components/navigator/`:
 
-- `avatar-host.tsx` — Navi, the animated SVG mascot (mood-driven via the Script Engine)
-- `navigator-hero.tsx` — avatar + scripted speech bubble + single next-action CTA
+- `avatar-host.tsx` — Navi, the animated SVG mascot (mood-driven via the Script Engine); also accepts an optional transient `reaction` (bounce/wiggle/wink/glance) + a `talking` mouth, driven by `navi-host`. Calm by default, so the other screens that use her are unchanged
+- `navi-host.tsx` — **`"use client"`** the *interactive* host (home hero only): owns the tappable avatar, attribution, and speech bubble. Tap → bounce + sparkle burst + a `NAVI_REACTIONS` one-liner that swaps into the bubble (spoken if voice is on); idle winks/glances; reacts live to the host advancing the phase (`NAVI_ARRIVAL_LINES`) and the headcount rising (`NAVI_PRESENCE_LINE`)
+- `navi-tips.tsx` — **`"use client"`** rotating, phase-aware tips ticker (`NAVI_TIPS`) — proactive guidance, tap for another; host-led, never a chat box
+- `navigator-hero.tsx` — composes `NaviHost` + the single next-action CTA + `NaviTips`
 - `phase-progress.tsx` — event-journey track with Now / Up next callouts
 - `game-preview-card.tsx` — live game **entry point** + leaderboard peek (not the game itself)
 - `status-card.tsx` — check-in + seat
@@ -248,6 +250,20 @@ live journey, below) and the **onboarded persona** (name + seat) from
 only before any scores arrive. The game-preview **"online" stat** is the live
 connected-attendee headcount (`usePlayerCount()`, min 1 since this device counts)
 — not a seed.
+
+**Interactive Navi (the "lively host" layer).** On the home hero Navi is no
+longer a static mascot: `navi-host.tsx` makes her **tappable** (springy bounce +
+sparkle burst + happy-mood flash + a playful one-liner that swaps into her
+bubble) and **alive** (idle winks/glances, a speaking mouth), and she reacts
+**live** to the event — an excited wiggle + a contextual line when the host
+advances the phase or the attendee headcount jumps. A `navi-tips.tsx` ticker
+rotates phase-aware guidance under the CTA. Copy + timings + the `NaviReaction`
+enum live in `src/constants/navi.ts`; selection/formatting helpers in
+`src/utils/navi.ts`; the `navi-*` gesture keyframes in `globals.css` are all
+reduced-motion-guarded. This stays true to the product direction — **Navi
+offers, the attendee never has to ask** (no chat box). Verified end-to-end in
+headless Chrome (tap reaction, tip rotation, live phase + presence reactions,
+the "tap me" hint) with no console errors and no overflow at 430px.
 
 ## Screen 2 — built
 

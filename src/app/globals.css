@@ -308,13 +308,95 @@
 .animate-bob { animation: ihhh-bob 3s ease-in-out infinite; }
 .animate-pop-rise { animation: ihhh-pop-rise 0.7s ease-out forwards; }
 
+/* ------------------------------------------------------------------ */
+/*  Navi interactive gestures (tap / live reactions / idle life)      */
+/*  She's a live host: taps bounce her, live events make her wiggle,  */
+/*  and idle winks/glances keep her feeling awake.                    */
+/* ------------------------------------------------------------------ */
+
+/* Tap → springy squash-and-stretch */
+@keyframes ihhh-navi-bounce {
+  0% { transform: scale(1, 1); }
+  25% { transform: scale(1.14, 0.88); }
+  45% { transform: scale(0.92, 1.1); }
+  65% { transform: scale(1.05, 0.97); }
+  82% { transform: scale(0.99, 1.01); }
+  100% { transform: scale(1, 1); }
+}
+/* Live event → excited shimmy */
+@keyframes ihhh-navi-wiggle {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  20% { transform: rotate(-8deg) scale(1.06); }
+  40% { transform: rotate(7deg) scale(1.06); }
+  60% { transform: rotate(-5deg) scale(1.03); }
+  80% { transform: rotate(3deg) scale(1.01); }
+}
+/* Idle → subtle look-around head tilt */
+@keyframes ihhh-navi-glance {
+  0%, 100% { transform: rotate(0deg) translateX(0); }
+  35% { transform: rotate(-5deg) translateX(-2px); }
+  70% { transform: rotate(4deg) translateX(2px); }
+}
+/* Idle → quick one-eyed wink (applied to a single eye group) */
+@keyframes ihhh-navi-wink {
+  0%, 100% { transform: scaleY(1); }
+  40%, 62% { transform: scaleY(0.1); }
+}
+/* The one-liner pop bubble springing in */
+@keyframes ihhh-navi-pop {
+  0% { opacity: 0; transform: translateY(6px) scale(0.7); }
+  60% { opacity: 1; transform: translateY(-2px) scale(1.05); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* Sparkle burst radiating out on a tap (per-particle --bx/--by direction) */
+@keyframes ihhh-navi-burst {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.3) rotate(0deg); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--bx, 0), var(--by, 0)) scale(1.15) rotate(40deg); }
+}
+/* Mouth movement while Navi "speaks" */
+@keyframes ihhh-navi-talk {
+  0%, 100% { transform: scaleY(0.55); }
+  50% { transform: scaleY(1.15); }
+}
+/* Tips ticker text swapping in */
+@keyframes ihhh-navi-tip {
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-navi-bounce { animation: ihhh-navi-bounce 0.62s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.animate-navi-wiggle { animation: ihhh-navi-wiggle 0.8s ease-in-out both; }
+.animate-navi-glance { animation: ihhh-navi-glance 1.5s ease-in-out both; }
+.animate-navi-wink {
+  animation: ihhh-navi-wink 0.5s ease-in-out both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.animate-navi-pop { animation: ihhh-navi-pop 0.34s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.animate-navi-burst { animation: ihhh-navi-burst 0.66s ease-out forwards; }
+.animate-navi-talk {
+  animation: ihhh-navi-talk 0.26s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.animate-navi-tip { animation: ihhh-navi-tip 0.4s ease-out both; }
+
 @media (prefers-reduced-motion: reduce) {
   .animate-float,
   .animate-blink,
   .animate-pulse-ring,
   .animate-sparkle,
   .animate-bob,
-  .animate-pop-rise {
+  .animate-pop-rise,
+  .animate-navi-bounce,
+  .animate-navi-wiggle,
+  .animate-navi-glance,
+  .animate-navi-wink,
+  .animate-navi-pop,
+  .animate-navi-burst,
+  .animate-navi-talk,
+  .animate-navi-tip {
     animation: none;
   }
 }

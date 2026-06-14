@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-06-14
+
+### Added
+- Interactive Navi on the home hero: tap her for a springy bounce + sparkle burst + happy-mood flash and a playful one-liner that swaps into her speech bubble (spoken when voice is on); a first-time "tap me" hint
+- Idle life: Navi now winks / glances on a random interval so she never looks frozen, plus a speaking mouth animation while she talks
+- Navi's tips ticker (src/components/navigator/navi-tips.tsx): a rotating, phase-aware proactive-guidance line under the hero CTA — auto-advances, tap for another (read aloud when voice is on)
+- Live-event reactions: Navi wiggles + exclaims a contextual line when the host advances the event phase, and when the live attendee headcount rises (throttled)
+- NaviReaction enum + NAVI_CONFIG / NAVI_TIPS / NAVI_REACTIONS / NAVI_ARRIVAL_LINES / NAVI_PRESENCE_LINE (src/constants/navi.ts) and navi util helpers — getNaviTips / nextNaviReaction / getNaviArrivalLine / formatNaviPresence / estimateTalkMs (src/utils/navi.ts)
+- navi- gesture keyframes (bounce / wiggle / wink / glance / talk / pop bubble / sparkle burst / tip swap) in globals.css, all disabled under prefers-reduced-motion
+
+### Changed
+- AvatarHost gained optional reaction / reactionKey / talking props (split eyes for a one-eyed wink, nested gesture layer so float + gesture compose, talking mouth, tap sparkle burst); its calm default is unchanged, so the other screens look identical
+- NavigatorHero now composes the interactive NaviHost (which owns the avatar, attribution, speech bubble, and scripted-line voice) + NaviTips instead of a static AvatarHost
+
 ## 2026-06-08
 
 ### Fixed

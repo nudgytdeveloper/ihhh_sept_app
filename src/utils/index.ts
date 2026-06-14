@@ -12,4 +12,5 @@ export * from "./shape-detection";
 export * from "./realtime";
 export * from "./use-game-channel";
 export * from "./navi-voice";
+export * from "./navi";
 export * from "./player-identity";
