@@ -17,6 +17,8 @@ export interface GameChannelHandlers {
   onPhase?: (phase: EventPhase) => void;
   /** The live count of connected attendees changed (from the server). */
   onPresence?: (count: number) => void;
+  /** The host fired a synchronized pre-round countdown for every phone. */
+  onCountdown?: (seconds: number) => void;
   /**
    * A late-joining attendee asked for the current snapshot. Host-only: return the
    * latest session to re-share it. Attendees omit this.
@@ -66,6 +68,8 @@ export function useGameChannel(handlers: GameChannelHandlers = {}) {
         current.onPhase?.(message.phase);
       } else if (message.type === RealtimeMessage.Presence) {
         current.onPresence?.(message.count);
+      } else if (message.type === RealtimeMessage.Countdown) {
+        current.onCountdown?.(message.seconds);
       } else if (message.type === RealtimeMessage.RequestState) {
         const snapshot = current.getStateForSync?.();
         if (snapshot) channel.publishState(snapshot);
@@ -98,5 +102,9 @@ export function useGameChannel(handlers: GameChannelHandlers = {}) {
     channelRef.current?.publishPhase(phase);
   }, []);
 
-  return { publishState, pushReminder, publishScore, publishPhase };
+  const publishCountdown = useCallback((seconds: number) => {
+    channelRef.current?.publishCountdown(seconds);
+  }, []);
+
+  return { publishState, pushReminder, publishScore, publishPhase, publishCountdown };
 }

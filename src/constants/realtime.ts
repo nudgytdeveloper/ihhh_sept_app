@@ -27,6 +27,8 @@ export enum RealtimeMessage {
   Phase = "phase",
   /** The server fanning out the live count of connected attendees (server → all). */
   Presence = "presence",
+  /** Host firing a synchronized pre-round countdown for every phone (one-off). */
+  Countdown = "countdown",
 }
 
 /** Available realtime transports (selected behind the GameChannel facade). */

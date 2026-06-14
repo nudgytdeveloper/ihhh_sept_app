@@ -1,16 +1,27 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { AvatarHost } from "@/components/navigator/avatar-host";
 import { WelcomeGate } from "@/components/navigator/welcome-gate";
+import { ConfettiBurst } from "@/components/effects/confetti";
+import { CountdownOverlay } from "@/components/effects/countdown-overlay";
 import { EventPhase, PHASE_ORDER } from "@/constants/phases";
 import { GameStatus } from "@/constants/game";
 import { AvatarMood } from "@/constants/statuses";
-import { HOST_REMINDERS } from "@/constants/host";
+import { HOST_REMINDERS, CELEBRATION } from "@/constants/host";
 import { useGameChannel } from "@/utils/use-game-channel";
 import { usePlayerIdentity } from "@/utils/player-identity";
 import { speakLine } from "@/utils/navi-voice";
+import { formatNaviWinner } from "@/utils/navi";
+import { useCountdown } from "@/utils/use-countdown";
 import type { GameSessionState, ScoreEntry } from "@/types";
 
 /**
@@ -24,6 +35,9 @@ const LiveLeaderboardContext = createContext<ScoreEntry[]>([]);
 
 /** Live count of connected attendee devices (server-tracked), 0 until known. */
 const PlayerCountContext = createContext<number>(0);
+
+/** The announced game winner's name (null until the host announces) — the room-wide cheer. */
+const WinnerContext = createContext<string | null>(null);
 
 /**
  * Live host-driven game status. Defaults to Idle (not started → not joinable)
@@ -56,6 +70,11 @@ export function usePlayerCount(): number {
   return useContext(PlayerCountContext);
 }
 
+/** The announced winner's name — drives the home Navi's visual cheer. */
+export function useWinnerName(): string | null {
+  return useContext(WinnerContext);
+}
+
 /**
  * Shell wrapper for every attendee screen. It owns the single realtime
  * subscription for the attendee area — receiving the host-driven event phase
@@ -69,9 +88,49 @@ export function AttendeeShell({ children }: { children: React.ReactNode }) {
   const [gameStatus, setGameStatus] = useState<GameStatus>(GameStatus.Idle);
   const [liveScores, setLiveScores] = useState<ScoreEntry[]>([]);
   const [playerCount, setPlayerCount] = useState(0);
+  const [winnerName, setWinnerName] = useState<string | null>(null);
+  const [celebrating, setCelebrating] = useState(false);
+  const [celebrateKey, setCelebrateKey] = useState(0);
+
+  // Refs for the room-wide winner celebration (fired from a message callback).
+  const prevWinnerRef = useRef<string | null>(null);
+  const onboardedRef = useRef(false);
+  const celebrateTimer = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    onboardedRef.current = identity.onboarded;
+  });
+  useEffect(() => () => window.clearTimeout(celebrateTimer.current), []);
+
+  const { value: countdownValue, start: startCountdown } = useCountdown();
 
   const onPhase = useCallback((next: EventPhase) => setPhase(next), []);
-  const onState = useCallback((state: GameSessionState) => setGameStatus(state.status), []);
+  // Track the host's session: game status + the announced winner. When a *new*
+  // winner is announced, every onboarded attendee phone celebrates — confetti +
+  // a Navi voice/toast cheer — on whatever screen they're on (this is the one
+  // always-mounted attendee subscription).
+  const onState = useCallback((state: GameSessionState) => {
+    setGameStatus(state.status);
+    const next = state.winnerName ?? null;
+    setWinnerName(next);
+    if (!next) {
+      prevWinnerRef.current = null;
+      return;
+    }
+    if (next === prevWinnerRef.current) return;
+    prevWinnerRef.current = next;
+    if (!onboardedRef.current) return;
+    setCelebrateKey((k) => k + 1);
+    setCelebrating(true);
+    window.clearTimeout(celebrateTimer.current);
+    celebrateTimer.current = window.setTimeout(
+      () => setCelebrating(false),
+      CELEBRATION.confettiMs,
+    );
+    toast.success(`🏆 ${next} wins!`, {
+      description: "What a game — well played, everyone!",
+    });
+    speakLine(formatNaviWinner(next));
+  }, []);
   const onLeaderboard = useCallback((entries: ScoreEntry[]) => setLiveScores(entries), []);
   const onPresence = useCallback((count: number) => setPlayerCount(count), []);
   const onReminder = useCallback((reminderId: string) => {
@@ -80,6 +139,10 @@ export function AttendeeShell({ children }: { children: React.ReactNode }) {
     toast(reminder.label, { description: reminder.detail });
     speakLine(`${reminder.label}. ${reminder.detail}.`);
   }, []);
+  const onCountdown = useCallback(
+    (seconds: number) => startCountdown(seconds),
+    [startCountdown],
+  );
 
   // Pass this device's id (once hydrated) so the server counts it toward the live
   // headcount — this is the one always-mounted attendee subscription, so it is
@@ -91,6 +154,7 @@ export function AttendeeShell({ children }: { children: React.ReactNode }) {
     onReminder,
     onLeaderboard,
     onPresence,
+    onCountdown,
   });
 
   const loaded = identity.id !== "";
@@ -100,13 +164,21 @@ export function AttendeeShell({ children }: { children: React.ReactNode }) {
       <GameStatusContext.Provider value={gameStatus}>
         <LiveLeaderboardContext.Provider value={liveScores}>
           <PlayerCountContext.Provider value={playerCount}>
-            {!loaded ? (
-              <ShellSplash />
-            ) : !identity.onboarded ? (
-              <WelcomeGate />
-            ) : (
-              children
-            )}
+            <WinnerContext.Provider value={winnerName}>
+              {!loaded ? (
+                <ShellSplash />
+              ) : !identity.onboarded ? (
+                <WelcomeGate />
+              ) : (
+                <>
+                  {children}
+                  {celebrating ? (
+                    <ConfettiBurst key={celebrateKey} count={CELEBRATION.confettiPieces} />
+                  ) : null}
+                  <CountdownOverlay value={countdownValue} />
+                </>
+              )}
+            </WinnerContext.Provider>
           </PlayerCountContext.Provider>
         </LiveLeaderboardContext.Provider>
       </GameStatusContext.Provider>

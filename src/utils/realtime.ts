@@ -17,7 +17,8 @@ export type RealtimeChannelMessage =
   | { type: RealtimeMessage.Score; entry: ScoreEntry }
   | { type: RealtimeMessage.Leaderboard; entries: ScoreEntry[] }
   | { type: RealtimeMessage.Phase; phase: EventPhase }
-  | { type: RealtimeMessage.Presence; count: number };
+  | { type: RealtimeMessage.Presence; count: number }
+  | { type: RealtimeMessage.Countdown; seconds: number };
 
 export type RealtimeHandler = (message: RealtimeChannelMessage) => void;
 
@@ -32,6 +33,7 @@ interface Transport {
   publishReminder(reminderId: string): void;
   publishScore(entry: ScoreEntry): void;
   publishPhase(phase: EventPhase): void;
+  publishCountdown(seconds: number): void;
   requestState(): void;
   close(): void;
 }
@@ -63,6 +65,9 @@ class BroadcastTransport implements Transport {
   }
   publishPhase(phase: EventPhase): void {
     this.channel?.postMessage({ type: RealtimeMessage.Phase, phase });
+  }
+  publishCountdown(seconds: number): void {
+    this.channel?.postMessage({ type: RealtimeMessage.Countdown, seconds });
   }
   requestState(): void {
     this.channel?.postMessage({ type: RealtimeMessage.RequestState });
@@ -107,6 +112,10 @@ class SseTransport implements Transport {
       const { count } = JSON.parse((event as MessageEvent).data);
       this.emit({ type: RealtimeMessage.Presence, count });
     });
+    source.addEventListener(RealtimeMessage.Countdown, (event) => {
+      const { seconds } = JSON.parse((event as MessageEvent).data);
+      this.emit({ type: RealtimeMessage.Countdown, seconds });
+    });
     this.source = source;
   }
   private emit(message: RealtimeChannelMessage): void {
@@ -136,6 +145,9 @@ class SseTransport implements Transport {
   publishPhase(phase: EventPhase): void {
     this.post({ type: RealtimeMessage.Phase, phase });
   }
+  publishCountdown(seconds: number): void {
+    this.post({ type: RealtimeMessage.Countdown, seconds });
+  }
   requestState(): void {
     // No-op: the server replays the current state + board to every new EventSource.
   }
@@ -155,6 +167,7 @@ class NoopTransport implements Transport {
   publishReminder(): void {}
   publishScore(): void {}
   publishPhase(): void {}
+  publishCountdown(): void {}
   requestState(): void {}
   close(): void {}
 }
@@ -195,6 +208,9 @@ export class GameChannel {
   }
   publishPhase(phase: EventPhase): void {
     this.transport.publishPhase(phase);
+  }
+  publishCountdown(seconds: number): void {
+    this.transport.publishCountdown(seconds);
   }
   requestState(): void {
     this.transport.requestState();

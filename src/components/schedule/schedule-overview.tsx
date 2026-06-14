@@ -1,4 +1,6 @@
-import { AvatarHost } from "@/components/navigator/avatar-host";
+"use client";
+
+import { TappableNavi } from "@/components/navigator/tappable-navi";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { AVATAR_NAME } from "@/constants/app";
@@ -6,11 +8,13 @@ import { EventPhase, PHASE_ORDER, PHASE_META } from "@/constants/phases";
 import { SCHEDULE_INTRO } from "@/constants/avatar-scripts";
 import { getAvatarScript, getPhaseIndex, getPhaseProgress } from "@/utils/event";
 import { template } from "@/utils/format";
+import { useNaviGestures } from "@/utils/use-navi-gestures";
 
 /**
  * Schedule hero: a compact Navi guide presence + a day-at-a-glance progress
- * summary. Orients the attendee before the detailed timeline below — the
- * avatar still leads, in keeping with the product direction.
+ * summary. Orients the attendee before the detailed timeline below — the avatar
+ * leads (and is tappable for a playful one-liner), in keeping with the product
+ * direction.
  */
 export function ScheduleOverview({
   phase,
@@ -26,11 +30,19 @@ export function ScheduleOverview({
   const step = getPhaseIndex(phase) + 1;
   const progress = getPhaseProgress(phase);
   const intro = template(SCHEDULE_INTRO, { name, phase: current.label });
+  const gestures = useNaviGestures();
+  const displayIntro = gestures.pop ?? intro;
 
   return (
     <Card className="gap-0 overflow-hidden rounded-3xl border-border/60 p-5 shadow-soft">
       <div className="flex items-start gap-3">
-        <AvatarHost mood={script.mood} className="size-16 shrink-0" />
+        <TappableNavi
+          gestures={gestures}
+          name={name}
+          baseMood={script.mood}
+          className="size-16"
+          label={`Tap ${AVATAR_NAME}, your guide, to say hi`}
+        />
         <div className="min-w-0 pt-0.5">
           <span className="inline-flex items-center gap-1.5">
             <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
@@ -44,8 +56,11 @@ export function ScheduleOverview({
         </div>
       </div>
 
-      <p className="mt-3 text-pretty text-sm leading-relaxed text-muted-foreground">
-        {intro}
+      <p
+        key={displayIntro}
+        className="animate-navi-tip mt-3 text-pretty text-sm leading-relaxed text-muted-foreground"
+      >
+        {displayIntro}
       </p>
 
       {/* Day progress */}

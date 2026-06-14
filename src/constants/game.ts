@@ -92,8 +92,11 @@ export const GAME_CONFIG = {
   shapeMatchThreshold: 0.7,
 
   /* --- live-round timing (Screen 4) --- */
-  /** "Get ready" countdown length before a round starts, in seconds. */
+  /** "Get ready" countdown length before a round starts, in seconds. Also the
+   *  length of the host-led synchronized countdown across all phones. */
   introSeconds: 3,
+  /** How long the synchronized "GO!" flash lingers before the overlay clears, in ms. */
+  countdownGoMs: 900,
   /** Boss appears once the round clock drops to this many seconds remaining. */
   bossSpawnAtSecondsRemaining: 35,
   /** Max mini-viruses visible at once (older ones cycle out / "escape"). */

@@ -36,3 +36,11 @@ export const LOG_TONE_DOT: Record<LogTone, string> = {
   [LogTone.Warn]: "bg-amber-500",
   [LogTone.Danger]: "bg-rose-500",
 };
+
+/** Winner-announcement celebration (confetti burst — host's big screen + every attendee phone). */
+export const CELEBRATION = {
+  /** How long the confetti overlay stays mounted after an announce. */
+  confettiMs: 4200,
+  /** Number of confetti pieces in a burst. */
+  confettiPieces: 90,
+} as const;

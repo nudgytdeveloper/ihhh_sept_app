@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-15
+
+### Added
+- Host-led synchronized pre-round countdown: a new "3·2·1 Start" button on the Host Control Panel fires a "3·2·1·GO" that Navi leads in sync on every attendee phone and the host's own screen (over SSE), then auto-starts the round as it hits GO
+- CountdownOverlay (src/components/effects/countdown-overlay.tsx) — full-screen Navi-led overlay; she narrates each tick aloud when voice is on — driven by a useCountdown ticker hook (src/utils/use-countdown.ts)
+- Countdown realtime message end-to-end: RealtimeMessage.Countdown, hub publishCountdown (one-off fan-out, not stored/replayed), publish-route handling, GameChannel.publishCountdown + useGameChannel onCountdown / publishCountdown
+- ihhh-countdown-pop keyframe (globals.css, reduced-motion-guarded), NAVI_COUNTDOWN_* copy (src/constants/navi.ts), and GAME_CONFIG.countdownGoMs
+
 ## 2026-06-14
 
 ### Added
@@ -9,10 +17,15 @@
 - Live-event reactions: Navi wiggles + exclaims a contextual line when the host advances the event phase, and when the live attendee headcount rises (throttled)
 - NaviReaction enum + NAVI_CONFIG / NAVI_TIPS / NAVI_REACTIONS / NAVI_ARRIVAL_LINES / NAVI_PRESENCE_LINE (src/constants/navi.ts) and navi util helpers — getNaviTips / nextNaviReaction / getNaviArrivalLine / formatNaviPresence / estimateTalkMs (src/utils/navi.ts)
 - navi- gesture keyframes (bounce / wiggle / wink / glance / talk / pop bubble / sparkle burst / tip swap) in globals.css, all disabled under prefers-reduced-motion
+- Tap-to-react extended to the schedule guide and lobby coach Navis: tapping either plays the bounce + sparkle burst + happy-mood flash and swaps a playful one-liner into that screen's own intro/bubble
+- Celebratory confetti burst on the Host Control Panel when the winner is announced — a pure-CSS/DOM ConfettiBurst (src/components/effects/confetti.tsx) in the brand palette, reduced-motion-safe; CELEBRATION tuning + ihhh-confetti keyframe (src/constants/host.ts, globals.css)
+- Shared useNaviGestures() hook (src/utils/use-navi-gestures.ts) + a reusable TappableNavi button (src/components/navigator/tappable-navi.tsx) that centralize the tap / idle / reaction mechanics for every tappable Navi
+- Room-wide winner celebration: when the host announces the winner, every onboarded attendee phone celebrates on whatever screen it's on — confetti + a 🏆 toast + Navi voicing the cheer (driven by AttendeeShell off the broadcast winnerName), and the home Navi cheers visually (wiggle + cheer line in her bubble). New WinnerContext/useWinnerName on AttendeeShell, NAVI_WINNER_CHEER + formatNaviWinner (src/constants/navi.ts, src/utils/navi.ts)
 
 ### Changed
 - AvatarHost gained optional reaction / reactionKey / talking props (split eyes for a one-eyed wink, nested gesture layer so float + gesture compose, talking mouth, tap sparkle burst); its calm default is unchanged, so the other screens look identical
 - NavigatorHero now composes the interactive NaviHost (which owns the avatar, attribution, speech bubble, and scripted-line voice) + NaviTips instead of a static AvatarHost
+- NaviHost refactored to consume the shared useNaviGestures hook + TappableNavi (behavior unchanged); schedule-overview is now a client component and lobby-coach is interactive, both via the shared hook
 
 ## 2026-06-08
 

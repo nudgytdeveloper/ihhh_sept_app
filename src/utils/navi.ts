@@ -10,6 +10,7 @@ import {
   NAVI_REACTIONS,
   NAVI_ARRIVAL_LINES,
   NAVI_PRESENCE_LINE,
+  NAVI_WINNER_CHEER,
   NAVI_CONFIG,
 } from "@/constants/navi";
 import { template } from "@/utils/format";
@@ -47,6 +48,11 @@ export function getNaviArrivalLine(phase: EventPhase, name: string): string {
 /** Navi's reaction to the live attendee headcount rising. */
 export function formatNaviPresence(count: number): string {
   return template(NAVI_PRESENCE_LINE, { count: String(count) });
+}
+
+/** Navi's room-wide cheer when the host announces the winner. */
+export function formatNaviWinner(name: string): string {
+  return template(NAVI_WINNER_CHEER, { winner: name });
 }
 
 /**

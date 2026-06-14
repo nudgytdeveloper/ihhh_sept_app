@@ -13,4 +13,6 @@ export * from "./realtime";
 export * from "./use-game-channel";
 export * from "./navi-voice";
 export * from "./navi";
+export * from "./use-navi-gestures";
+export * from "./use-countdown";
 export * from "./player-identity";

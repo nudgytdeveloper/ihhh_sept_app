@@ -133,6 +133,11 @@ export function publishReminder(reminderId: string): void {
   broadcast(RealtimeMessage.Reminder, { reminderId });
 }
 
+/** Host fired a synchronized pre-round countdown → fan out (one-off, not stored). */
+export function publishCountdown(seconds: number): void {
+  broadcast(RealtimeMessage.Countdown, { seconds });
+}
+
 function broadcast(event: string, data: unknown): void {
   for (const send of subscribers) {
     try {

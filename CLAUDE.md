@@ -177,7 +177,7 @@ src/
 │  ├─ game.ts                 # GameStatus, BossShape, SHAPE_META, GAME_CONFIG, GAME_STATUS_META, RoundPhase, BossOutcome
 │  ├─ avatar-scripts.ts       # AVATAR_SCRIPTS + SCHEDULE_INTRO/LOBBY_INTRO/GAME_SCRIPTS (Script Engine)
 │  ├─ host.ts                 # HOST_REMINDERS, LogTone + LOG_TONE_DOT (host panel)
-│  ├─ realtime.ts             # REALTIME_CHANNEL, RealtimeMessage (State/Reminder/Score/Leaderboard/Phase/Presence), paths
+│  ├─ realtime.ts             # REALTIME_CHANNEL, RealtimeMessage (State/Reminder/Score/Leaderboard/Phase/Presence/Countdown), paths
 │  ├─ voice.ts                # VOICE_CONFIG, VOICE_PREF, VOICE_STORAGE_KEY + VoiceProvider, VOICE_PROVIDER, VOICE_API_PATH, ELEVENLABS_CONFIG (Navi voice)
 │  ├─ player.ts               # attendee identity: storage keys, handle pools, seat-allocation pools
 │  └─ index.ts                # barrel
@@ -257,7 +257,11 @@ sparkle burst + happy-mood flash + a playful one-liner that swaps into her
 bubble) and **alive** (idle winks/glances, a speaking mouth), and she reacts
 **live** to the event — an excited wiggle + a contextual line when the host
 advances the phase or the attendee headcount jumps. A `navi-tips.tsx` ticker
-rotates phase-aware guidance under the CTA. Copy + timings + the `NaviReaction`
+rotates phase-aware guidance under the CTA. The tap/idle/reaction mechanics are
+centralized in `useNaviGestures()` (`src/utils/use-navi-gestures.ts`) + a
+reusable `TappableNavi` button (`src/components/navigator/tappable-navi.tsx`), so
+the **schedule guide and lobby coach Navis are tappable too** — their one-liner
+swaps into that screen's own intro/bubble. Copy + timings + the `NaviReaction`
 enum live in `src/constants/navi.ts`; selection/formatting helpers in
 `src/utils/navi.ts`; the `navi-*` gesture keyframes in `globals.css` are all
 reduced-motion-guarded. This stays true to the product direction — **Navi
@@ -270,7 +274,8 @@ the "tap me" hint) with no console errors and no overflow at 430px.
 **Event Schedule / Phase Timeline** is implemented at
 `src/app/(attendee)/schedule/page.tsx`, composed from `src/components/schedule/`:
 
-- `schedule-overview.tsx` — compact Navi guide + day-at-a-glance progress
+- `schedule-overview.tsx` — compact **tappable** Navi guide (tap → reaction +
+  one-liner swap, via `useNaviGestures`/`TappableNavi`) + day-at-a-glance progress
   ("Phase n of N", current phase, progress bar)
 - `schedule-timeline.tsx` — vertical phase timeline; each row's state comes from
   `getPhaseState()` (`PhaseProgressState`: Done / Current / Next / Upcoming),
@@ -292,7 +297,8 @@ server component that exports `metadata` and renders the client orchestrator
 
 - `lobby-hero.tsx` — game banner: status pill, floating mini-viruses, and a
   "who's in" **live headcount** ("online now") with stacked avatars capped to it
-- `lobby-coach.tsx` — compact Navi coaching the attendee before the round
+- `lobby-coach.tsx` — compact **tappable** Navi coaching the attendee before the
+  round (tap → reaction + one-liner swap, via `useNaviGestures`/`TappableNavi`)
 - `how-to-play.tsx` — 3 rules (tap viruses → beat the COVID Boss by drawing a
   shape → climb the leaderboard); numbers from `GAME_CONFIG`, shapes from
   `SHAPE_META`
@@ -349,7 +355,11 @@ from `src/components/host/`:
 - `boss-control.tsx` — pick a `BossShape` and unleash the boss (Active →
   BossActive); "Resume round" sends it away
 - `host-leaderboard.tsx` — live leaderboard (medals + current-user highlight),
-  Lock toggle, and Announce winner (crowns `getWinner()` with a 🏆 badge)
+  Lock toggle, and Announce winner (crowns `getWinner()` with a 🏆 badge); the
+  announce fires a celebratory **confetti burst** (`ConfettiBurst` from
+  `src/components/effects/confetti.tsx`, tuned by `CELEBRATION` in `constants/host.ts`)
+  — and, because the announce broadcasts `winnerName` in the session state, the
+  celebration goes **room-wide** to every attendee phone too (see below)
 - `host-activity-log.tsx` — timestamped feed of recent actions (newest first,
   capped), tone-colored via `LOG_TONE_DOT`
 
@@ -386,6 +396,27 @@ and schedule update live. Plumbing: `RealtimeMessage.Phase`, hub
 reminder + leaderboard subscription, provides phase via `useEventPhase()` and the
 shared board via `useLiveLeaderboard()`, and renders the onboarding gate); it
 replaced the old `AttendeeRealtimeListener`.
+
+**Room-wide winner celebration.** The host's session snapshot already carries
+`winnerName`, so `AttendeeShell` watches it: when a *new* winner is announced,
+every onboarded attendee phone celebrates on whatever screen it's on — a
+`ConfettiBurst` + a 🏆 toast + Navi voicing the cheer (`NAVI_WINNER_CHEER` /
+`formatNaviWinner`). The announced name is also shared via `useWinnerName()`, so
+the home Navi (`NaviHost`) cheers *visually* (a wiggle + the cheer line in her
+bubble; the voice stays with `AttendeeShell` so she doesn't talk over herself).
+
+**Synchronized pre-round countdown (Navi leads across all phones).** The Host
+Control Panel's **"3·2·1 Start"** button (`host-status-banner`) fires a one-off
+`RealtimeMessage.Countdown` (hub `publishCountdown` → fanned to every SSE client,
+**not** stored, so a late joiner won't replay a finished count). Each device —
+attendee phones via `AttendeeShell`, and the host's own screen — runs the same
+local `useCountdown` ticker on receipt, so the "3 · 2 · 1 · GO!" lines up without
+any clock-sync. `CountdownOverlay` (`src/components/effects/countdown-overlay.tsx`)
+is the full-screen Navi-led overlay; she narrates each tick aloud when voice is
+on. The host schedules the actual round start (`handleStart`) for the end of the
+count, so the round goes live exactly as it hits **GO!**. Plumbing mirrors the
+reminder path: `GameChannel.publishCountdown` / `useGameChannel({ onCountdown })`,
+`countdownGoMs` + reused `introSeconds` in `GAME_CONFIG`, copy in `constants/navi.ts`.
 
 **Realtime (host drives attendees live, cross-device).** Screen 5 (`/host`) and
 Screen 4 (`/game/play`) sync over **Server-Sent Events** served by the app

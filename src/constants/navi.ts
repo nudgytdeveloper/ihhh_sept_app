@@ -133,5 +133,16 @@ export const NAVI_ARRIVAL_LINES: Record<EventPhase, string> = {
 /** Navi's reaction when more attendees join — `{count}` is the live headcount. */
 export const NAVI_PRESENCE_LINE = "Ooh, {count} of us in here now! 🎉";
 
+/** Navi's room-wide cheer when the host announces the winner — `{winner}` is the name. */
+export const NAVI_WINNER_CHEER =
+  "And the champion is {winner}! 🏆 Incredible game, everyone — give yourselves a round of applause! 🎉";
+
+/** Navi leading the synchronized pre-round countdown on every phone. */
+export const NAVI_COUNTDOWN_LEAD = "Round starting — get ready, everyone!";
+export const NAVI_COUNTDOWN_GO = "GO!";
+/** What Navi says aloud per tick (TTS-friendly) while she leads the count. */
+export const COUNTDOWN_WORDS: Record<number, string> = { 1: "One!", 2: "Two!", 3: "Three!" };
+export const NAVI_COUNTDOWN_GO_WORD = "Go!";
+
 /** First-time hint nudging the attendee to discover the tap interaction. */
 export const NAVI_TAP_HINT = "tap me!";

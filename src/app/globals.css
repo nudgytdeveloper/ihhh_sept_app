@@ -382,6 +382,28 @@
 }
 .animate-navi-tip { animation: ihhh-navi-tip 0.4s ease-out both; }
 
+/* Celebration confetti (host winner announce) — a one-shot rain from the top */
+@keyframes ihhh-confetti {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg); }
+  8% { opacity: 1; }
+  100% { opacity: 0.9; transform: translate3d(var(--drift, 0), 106vh, 0) rotate(var(--rot, 360deg)); }
+}
+.animate-confetti {
+  animation-name: ihhh-confetti;
+  animation-timing-function: cubic-bezier(0.2, 0.6, 0.5, 1);
+  animation-fill-mode: forwards;
+}
+
+/* Synchronized countdown number popping in each tick (3 · 2 · 1 · GO) */
+@keyframes ihhh-countdown-pop {
+  0% { opacity: 0; transform: scale(1.7); }
+  35% { opacity: 1; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.animate-countdown-pop {
+  animation: ihhh-countdown-pop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-float,
   .animate-blink,
@@ -396,7 +418,9 @@
   .animate-navi-pop,
   .animate-navi-burst,
   .animate-navi-talk,
-  .animate-navi-tip {
+  .animate-navi-tip,
+  .animate-confetti,
+  .animate-countdown-pop {
     animation: none;
   }
 }

@@ -1,4 +1,4 @@
-import { Play, Square, RotateCcw, Users, Zap } from "lucide-react";
+import { Play, Square, RotateCcw, Users, Zap, Timer } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,7 @@ export function HostStatusBanner({
   waves,
   activeBossShape,
   onStart,
+  onLaunchCountdown,
   onEnd,
   onReset,
 }: {
@@ -26,6 +27,7 @@ export function HostStatusBanner({
   waves: number;
   activeBossShape: BossShape | null;
   onStart: () => void;
+  onLaunchCountdown: () => void;
   onEnd: () => void;
   onReset: () => void;
 }) {
@@ -66,6 +68,15 @@ export function HostStatusBanner({
           >
             <Play className="size-4" />
             Start round
+          </Button>
+          <Button
+            variant="outline"
+            onClick={onLaunchCountdown}
+            disabled={!controls.canStart}
+            className="text-brand-teal"
+          >
+            <Timer className="size-4" />
+            3 · 2 · 1 Start
           </Button>
           <Button variant="destructive" onClick={onEnd} disabled={!controls.canEnd}>
             <Square className="size-4" />

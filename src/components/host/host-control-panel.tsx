@@ -17,6 +17,8 @@ import { EventJourneyControl } from "@/components/host/event-journey-control";
 import { BossControl } from "@/components/host/boss-control";
 import { HostLeaderboard } from "@/components/host/host-leaderboard";
 import { HostActivityLog, type LogEntry } from "@/components/host/host-activity-log";
+import { ConfettiBurst } from "@/components/effects/confetti";
+import { CountdownOverlay } from "@/components/effects/countdown-overlay";
 import {
   GameStatus,
   BossShape,
@@ -26,9 +28,10 @@ import {
   BOSS_NAME,
 } from "@/constants/game";
 import { EventPhase, PHASE_ORDER, PHASE_META } from "@/constants/phases";
-import { LogTone, HOST_REMINDERS, type HostReminder } from "@/constants/host";
+import { LogTone, HOST_REMINDERS, CELEBRATION, type HostReminder } from "@/constants/host";
 import { getHostControls, getWinner, toLeaderboard } from "@/utils/game";
 import { useGameChannel } from "@/utils/use-game-channel";
+import { useCountdown } from "@/utils/use-countdown";
 import { formatScore } from "@/utils/format";
 import { MOCK_EVENT_STATE } from "@/data/event";
 import type { LeaderboardEntry, GameSessionState, ScoreEntry } from "@/types";
@@ -55,6 +58,20 @@ export function HostControlPanel() {
   const [liveScores, setLiveScores] = useState<ScoreEntry[]>([]);
   const [log, setLog] = useState<LogEntry[]>([]);
 
+  // Winner-announce confetti: bump the key to (re)play, auto-clear after a beat.
+  const [celebrating, setCelebrating] = useState(false);
+  const [confettiKey, setConfettiKey] = useState(0);
+  const celebrateTimer = useRef<number | undefined>(undefined);
+  const countdownStartTimer = useRef<number | undefined>(undefined);
+  const { value: countdownValue, start: startCountdown } = useCountdown();
+  useEffect(
+    () => () => {
+      window.clearTimeout(celebrateTimer.current);
+      window.clearTimeout(countdownStartTimer.current);
+    },
+    [],
+  );
+
   const logIdRef = useRef(0);
   const controls = getHostControls(status);
 
@@ -75,11 +92,12 @@ export function HostControlPanel() {
     [status, activeBossShape, waves, locked, winner],
   );
   const sessionRef = useRef(session);
-  const { publishState, pushReminder, publishPhase } = useGameChannel({
+  const { publishState, pushReminder, publishPhase, publishCountdown } = useGameChannel({
     getStateForSync: () => sessionRef.current,
     onLeaderboard: setLiveScores,
     onPhase: setPhase,
     onPresence: setPlayerCount,
+    onCountdown: startCountdown,
   });
   useEffect(() => {
     sessionRef.current = session;
@@ -97,9 +115,25 @@ export function HostControlPanel() {
   }
 
   function handleStart() {
+    window.clearTimeout(countdownStartTimer.current);
     setStatus(GameStatus.Active);
     toast.success("Round started", { description: `${GAME_NAME} is live.` });
     addLog("Round started", LogTone.Success);
+  }
+
+  // Fire a synchronized 3·2·1 across every phone (and the host screen), then start
+  // the round automatically as it hits "GO!".
+  function handleLaunchCountdown() {
+    publishCountdown(GAME_CONFIG.introSeconds);
+    window.clearTimeout(countdownStartTimer.current);
+    countdownStartTimer.current = window.setTimeout(
+      handleStart,
+      GAME_CONFIG.introSeconds * 1000,
+    );
+    toast(`${GAME_NAME} starting`, {
+      description: "3 · 2 · 1 — counting down on every phone!",
+    });
+    addLog("Launched the 3·2·1 countdown", LogTone.Info);
   }
 
   function handleSpawnWave() {
@@ -137,17 +171,26 @@ export function HostControlPanel() {
       return;
     }
     setWinner(top);
+    setConfettiKey((k) => k + 1);
+    setCelebrating(true);
+    window.clearTimeout(celebrateTimer.current);
+    celebrateTimer.current = window.setTimeout(
+      () => setCelebrating(false),
+      CELEBRATION.confettiMs,
+    );
     toast.success(`🏆 ${top.name} wins!`, { description: `${formatScore(top.score)} points` });
     addLog(`Announced winner: ${top.name} (${formatScore(top.score)} pts)`, LogTone.Success);
   }
 
   function handleEnd() {
+    window.clearTimeout(countdownStartTimer.current);
     setStatus(GameStatus.Ended);
     toast("Game ended", { description: "Lock the board and announce the winner." });
     addLog("Game ended", LogTone.Warn);
   }
 
   function handleReset() {
+    window.clearTimeout(countdownStartTimer.current);
     setStatus(GameStatus.Lobby);
     setWaves(0);
     setLocked(false);
@@ -174,6 +217,11 @@ export function HostControlPanel() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 px-4 py-5 sm:px-6">
+      {celebrating ? (
+        <ConfettiBurst key={confettiKey} count={CELEBRATION.confettiPieces} />
+      ) : null}
+      <CountdownOverlay value={countdownValue} />
+
       <EventJourneyControl phase={phase} onSelectPhase={handleSelectPhase} />
 
       <HostStatusBanner
@@ -183,6 +231,7 @@ export function HostControlPanel() {
         waves={waves}
         activeBossShape={activeBossShape}
         onStart={handleStart}
+        onLaunchCountdown={handleLaunchCountdown}
         onEnd={handleEnd}
         onReset={handleReset}
       />
