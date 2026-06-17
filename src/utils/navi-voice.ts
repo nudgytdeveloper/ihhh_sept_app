@@ -8,6 +8,7 @@ import {
   VOICE_PROVIDER,
   VoiceProvider,
   VOICE_API_PATH,
+  CLOUD_VOICE_CONFIG,
 } from "@/constants/voice";
 
 /* ----------------------------- low-level speech ---------------------------- */
@@ -77,35 +78,77 @@ function speakViaWebSpeech(text: string): void {
   synth.speak(utterance);
 }
 
+/** Small awaitable delay (used for retry backoff). */
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Whether the current text is still the line Navi is meant to be speaking. */
+function isCurrentLine(text: string): boolean {
+  return voiceEnabled && text === lastSpoken;
+}
+
 /**
- * Speak a line with the ElevenLabs cloud voice (natural/human). Fetches the MP3
- * from our server route (which holds the secret key), caches it by text, and
- * plays it. Falls back to the Web Speech voice on any failure — no key, network
- * error, or autoplay block — so Navi always has a voice.
+ * Fetch a Navi line's MP3 from the voice route, retrying transient failures —
+ * a cold-start 502 on a free host, a rate-limit, or a network blip — with a
+ * short backoff before giving up. This is what keeps the *first* enable on the
+ * natural voice: on Render the very first /api/voice hit can 502 while the server
+ * warms, and without a retry the client would fall back to the robotic voice
+ * until the attendee toggled off and on again. Permanent failures (501 not
+ * configured / 4xx) and a line nobody is waiting on anymore bail immediately.
  */
-async function speakViaCloud(text: string): Promise<void> {
-  try {
-    let url = audioCache.get(text);
-    if (!url) {
+async function fetchCloudClip(text: string): Promise<string> {
+  const { clientRetries, clientRetryDelayMs } = CLOUD_VOICE_CONFIG;
+  for (let attempt = 0; ; attempt++) {
+    if (attempt > 0) {
+      await delay(clientRetryDelayMs * attempt);
+      // Stop retrying once voice is off or Navi has moved to a new line.
+      if (!isCurrentLine(text)) throw new Error("voice stale");
+    }
+    let status = 0; // 0 = fetch threw (network error) — treat as transient.
+    try {
       const res = await fetch(VOICE_API_PATH, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
       });
-      if (!res.ok) throw new Error(`voice route ${res.status}`);
-      url = URL.createObjectURL(await res.blob());
+      if (res.ok) return URL.createObjectURL(await res.blob());
+      status = res.status;
+    } catch {
+      status = 0;
+    }
+    const transient = status === 0 || status === 429 || status >= 500;
+    if (!transient || attempt >= clientRetries) {
+      throw new Error(`voice route ${status}`);
+    }
+  }
+}
+
+/**
+ * Speak a line with the ElevenLabs cloud voice (natural/human). Fetches the MP3
+ * from our server route (which holds the secret key), caches it by text, and
+ * plays it. Falls back to the Web Speech voice only after exhausting retries —
+ * no key, repeated network/upstream errors, or an autoplay block — so Navi always
+ * has a voice.
+ */
+async function speakViaCloud(text: string): Promise<void> {
+  try {
+    let url = audioCache.get(text);
+    if (!url) {
+      url = await fetchCloudClip(text);
       audioCache.set(text, url);
     }
     // The attendee may have toggled voice off or moved to a new line while the
     // clip was fetching — don't play a stale one.
-    if (!voiceEnabled || text !== lastSpoken) return;
+    if (!isCurrentLine(text)) return;
     stopAudio();
     const audio = new Audio(url);
     currentAudio = audio;
     await audio.play();
   } catch {
-    // Anything goes wrong → fall back to the always-available browser voice.
-    if (voiceEnabled && text === lastSpoken) speakViaWebSpeech(text);
+    // Out of retries (or autoplay blocked) → fall back to the always-available
+    // browser voice so Navi still speaks.
+    if (isCurrentLine(text)) speakViaWebSpeech(text);
   }
 }
 

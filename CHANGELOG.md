@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-17
+
+### Fixed
+- Navi voice: the first "enable voice" now stays on the natural ElevenLabs voice instead of falling back to the robotic Web Speech voice — a cold-start 502 on the first /api/voice hit is now retried (client + server) before any fallback, so the attendee no longer has to toggle voice off and on again
+
+### Added
+- CLOUD_VOICE_CONFIG (src/constants/voice.ts) — client/server retry counts + backoff for transient (5xx/429/network) cloud-voice failures
+
 ## 2026-06-15
 
 ### Added

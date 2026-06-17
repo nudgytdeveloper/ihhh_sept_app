@@ -1,4 +1,4 @@
-import { ELEVENLABS_CONFIG } from "@/constants/voice";
+import { CLOUD_VOICE_CONFIG, ELEVENLABS_CONFIG } from "@/constants/voice";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,6 +19,25 @@ const AUDIO_HEADERS = {
   "Content-Type": "audio/mpeg",
   "Cache-Control": "public, max-age=86400",
 } as const;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Call ElevenLabs, retrying transient upstream blips (5xx / 429 / network) with a
+ * short backoff. The first call after a cold start can fail while the upstream
+ * connection warms; a quick retry usually succeeds, so Navi keeps her natural
+ * voice instead of the client falling back to the robotic one. Permanent 4xx
+ * (bad key/voice/quota) returns immediately — retrying won't help.
+ */
+async function fetchTts(url: string, init: RequestInit): Promise<Response | null> {
+  let upstream: Response | null = null;
+  for (let attempt = 0; attempt <= CLOUD_VOICE_CONFIG.serverRetries; attempt++) {
+    if (attempt > 0) await sleep(CLOUD_VOICE_CONFIG.serverRetryDelayMs * attempt);
+    upstream = await fetch(url, init).catch(() => null);
+    if (upstream && (upstream.ok || (upstream.status >= 400 && upstream.status < 500))) break;
+  }
+  return upstream;
+}
 
 export async function POST(request: Request) {
   const apiKey = process.env.ELEVENLABS_API_KEY;
@@ -41,7 +60,7 @@ export async function POST(request: Request) {
     return new Response(cached, { headers: AUDIO_HEADERS });
   }
 
-  const upstream = await fetch(
+  const upstream = await fetchTts(
     `${ELEVENLABS_URL}/${voiceId}?output_format=${ELEVENLABS_CONFIG.outputFormat}`,
     {
       method: "POST",
@@ -56,7 +75,7 @@ export async function POST(request: Request) {
         voice_settings: ELEVENLABS_CONFIG.voiceSettings,
       }),
     },
-  ).catch(() => null);
+  );
 
   if (!upstream || !upstream.ok) {
     const detail = upstream ? await upstream.text().catch(() => "") : "network error";

@@ -60,6 +60,25 @@ export const VOICE_PROVIDER: VoiceProvider =
 export const VOICE_API_PATH = "/api/voice";
 
 /**
+ * Cloud-voice resilience. On a cold/free host (e.g. Render) the very first
+ * /api/voice hit can 502 while the server worker — or the ElevenLabs upstream —
+ * warms up; a quick retry then succeeds. Retrying transient failures
+ * (5xx / 429 / network) before falling back to the robotic Web Speech voice keeps
+ * Navi on her natural voice from the very first line, instead of only after the
+ * attendee toggles voice off and on again.
+ */
+export const CLOUD_VOICE_CONFIG = {
+  /** Extra client attempts after the first, for transient failures. */
+  clientRetries: 2,
+  /** Backoff before each client retry, multiplied by the attempt number (ms). */
+  clientRetryDelayMs: 500,
+  /** Extra server attempts when the ElevenLabs upstream itself blips. */
+  serverRetries: 2,
+  /** Backoff before each server retry, multiplied by the attempt number (ms). */
+  serverRetryDelayMs: 400,
+} as const;
+
+/**
  * ElevenLabs tuning. The secret API key + (optional) voice id are read ONLY from
  * server env (ELEVENLABS_API_KEY / ELEVENLABS_VOICE_ID) by the /api/voice route —
  * never bundled into the client. defaultVoiceId is the shared "Rachel" voice that
