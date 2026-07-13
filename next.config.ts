@@ -46,6 +46,11 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  // Serve the client-facing "how it works" page (public/flows.html) at a clean
+  // /flows URL (link-only, noindex — for sharing the sample flows).
+  async rewrites() {
+    return [{ source: "/flows", destination: "/flows.html" }];
+  },
 };
 
 export default nextConfig;

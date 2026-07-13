@@ -3,6 +3,7 @@
 ## 2026-07-13
 
 ### Added
+- Client-facing "how it works" page (`public/flows.html`) served at `/flows` (noindex, link-only) — a plain, non-technical walkthrough of the guest + team flows for sharing; `next.config.ts` rewrite `/flows` → `/flows.html`
 - Host control-room passcode (Nov Phase 6): server-only `HOST_TOKEN` gates `/host` (a Navi-styled passcode gate) and host-only publish actions — `/api/game/publish` now 401s host phase/reminder/state/countdown without a valid `x-host-token`, so attendees can't hijack the event or fan a push to every phone (scores stay open). Open when `HOST_TOKEN` is unset; `/api/host/verify` GET/POST + `src/utils/host-auth.ts` store
 - Rate limiting (Nov Phase 6): in-memory per-IP fixed-window limits on the paid/abusable routes — summaries (Gemini), transcribe (ElevenLabs), register, push-subscribe, host-verify — returning 429 + Retry-After (`src/server/rate-limit.ts`, `src/constants/rate-limit.ts`); the shared-NAT score path is deliberately unthrottled
 - Security headers (Nov Phase 6): CSP, HSTS (prod), X-Frame-Options DENY, X-Content-Type-Options, Referrer-Policy, Permissions-Policy on every route via `next.config.ts`
