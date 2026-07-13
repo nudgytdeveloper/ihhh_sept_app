@@ -12,6 +12,8 @@ export const PLAYER_STORAGE_KEYS = {
   name: "ihhh:player-name",
   seat: "ihhh:player-seat",
   onboarded: "ihhh:player-onboarded",
+  email: "ihhh:player-email",
+  goals: "ihhh:player-goals",
 } as const;
 
 /** Persisted-flag value for a completed welcome (entered their name). */

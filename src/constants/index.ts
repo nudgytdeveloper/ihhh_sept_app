@@ -10,3 +10,4 @@ export * from "./host";
 export * from "./realtime";
 export * from "./voice";
 export * from "./player";
+export * from "./registration";

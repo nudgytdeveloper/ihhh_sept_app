@@ -16,3 +16,4 @@ export * from "./navi";
 export * from "./use-navi-gestures";
 export * from "./use-countdown";
 export * from "./player-identity";
+export * from "./registration";

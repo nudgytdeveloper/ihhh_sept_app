@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-07-12
+
+### Added
+- Postgres persistence layer (Drizzle ORM): server-only `src/server/db/` (schema + lazy client + attendee store), `drizzle.config.ts`, and `db:push` / `db:studio` npm scripts; `attendees` table keyed by corporate email with seat, learning goals, and a `checked_in_at` attendance stamp
+- `/api/register` — registration endpoint: validates name/email/goals, upserts by email (returning attendees recover their original id + seat on a new device), gracefully accepts unpersisted registrations when `DATABASE_URL` is unset
+- Welcome gate registration (Nov-event MVP): two-step flow — name + corporate email, then learning goals (preset chips capped at 3 + free-text goal) — with inline error + retry on server failure
+- Registration constants (`src/constants/registration.ts`: `RegistrationStep`, `LEARNING_GOAL_PRESETS`, `REGISTRATION_LIMITS`, `EMPTY_LEARNING_GOALS`) and helpers (`src/utils/registration.ts`: email validation/normalization, goal toggling/shaping/sanitizing)
+- `LearningGoals` + `RegisteredAttendee` types; `PlayerIdentity` now carries `email` + `goals` (persisted per device)
+
+### Changed
+- `completeOnboarding(name)` replaced by async `completeRegistration({name, email, goals})` — registers server-side and adopts the returned canonical identity
+- `DATABASE_URL` documented in `.env.example` (local dev + Render Postgres)
+
 ## 2026-06-17
 
 ### Fixed

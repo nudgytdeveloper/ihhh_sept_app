@@ -1,0 +1,31 @@
+import { jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import type { LearningGoals, SeatInfo } from "@/types";
+
+/**
+ * Drizzle schema for the Nov-event persistence layer (Postgres).
+ *
+ * Server-only (lives under `src/server`, same rule as `game-hub.ts`): the
+ * client bundle must never import this. Tables are pushed with
+ * `npm run db:push` (drizzle-kit) — see `drizzle.config.ts`.
+ */
+
+/**
+ * One registered attendee, keyed by corporate email (the canonical identity —
+ * re-registering with the same email on a new device recovers the record).
+ * `checkedInAt` is stamped on the attendee's first live connection to the
+ * event, making the roster double as the attendance list.
+ */
+export const attendees = pgTable("attendees", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull().unique(),
+  name: text("name").notNull(),
+  /** Auto-allocated seat, as shown at the welcome step. */
+  seat: jsonb("seat").$type<SeatInfo>(),
+  /** Learning goals picked/typed at registration — feeds the AI session summaries. */
+  goals: jsonb("goals").$type<LearningGoals>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  /** First live connection at the event (null = registered but not yet attended). */
+  checkedInAt: timestamp("checked_in_at", { withTimezone: true }),
+});
+
+export type AttendeeRow = typeof attendees.$inferSelect;

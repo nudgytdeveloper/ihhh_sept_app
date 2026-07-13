@@ -105,6 +105,8 @@ point** — do **not** build the game UI there.
 npm run dev      # start dev server (Turbopack)
 npm run build    # production build + typecheck
 npm run lint     # eslint
+npm run db:push  # apply src/server/db/schema.ts to DATABASE_URL (drizzle-kit)
+npm run db:studio # browse the database (drizzle-kit studio)
 npx shadcn@latest add <component>   # add a shadcn/ui component
 ```
 
@@ -165,6 +167,7 @@ src/
 │     ├─ game/                # realtime SSE endpoints (server route handlers)
 │     │  ├─ stream/route.ts   # SSE stream — host + attendees subscribe (phase + state + leaderboard + presence); attendees pass ?playerId for the headcount
 │     │  └─ publish/route.ts  # host POSTs phase/state/reminders; attendees POST scores (fan-out)
+│     ├─ register/route.ts    # attendee registration: upsert by corporate email → Postgres (graceful no-DB fallback)
 │     └─ voice/route.ts       # Navi cloud TTS: POST a line → ElevenLabs (server-only key) → MP3; cached, 501 when unconfigured
 ├─ components/
 │  ├─ ui/                     # shadcn/ui primitives
@@ -180,6 +183,7 @@ src/
 │  ├─ realtime.ts             # REALTIME_CHANNEL, RealtimeMessage (State/Reminder/Score/Leaderboard/Phase/Presence/Countdown), paths
 │  ├─ voice.ts                # VOICE_CONFIG, VOICE_PREF, VOICE_STORAGE_KEY + VoiceProvider, VOICE_PROVIDER, VOICE_API_PATH, ELEVENLABS_CONFIG (Navi voice)
 │  ├─ player.ts               # attendee identity: storage keys, handle pools, seat-allocation pools
+│  ├─ registration.ts         # RegistrationStep, LEARNING_GOAL_PRESETS, REGISTRATION_LIMITS, REGISTER_API_PATH
 │  └─ index.ts                # barrel
 ├─ utils/                     # ⚠️ all reusable functions live here (see rules)
 │  ├─ format.ts               # formatCountdown, formatScore, getInitials, template
@@ -189,12 +193,17 @@ src/
 │  ├─ realtime.ts             # GameChannel — SSE / BroadcastChannel transport facade (swappable)
 │  ├─ use-game-channel.ts     # useGameChannel hook (publish state/score/reminder/phase + subscribe state/leaderboard/phase/presence; passes playerId)
 │  ├─ navi-voice.ts           # speakLine (ElevenLabs /api/voice → MP3, else Web Speech; auto-fallback) + useNaviVoice store
-│  ├─ player-identity.ts      # per-device identity (usePlayerIdentity, completeOnboarding, attendeeFromIdentity)
+│  ├─ player-identity.ts      # per-device identity (usePlayerIdentity, completeRegistration, attendeeFromIdentity)
+│  ├─ registration.ts         # email validation/normalization + learning-goal shaping (shared by gate + /api/register)
 │  └─ index.ts                # barrel
 ├─ lib/
 │  └─ utils.ts                # shadcn `cn()` helper ONLY (ecosystem convention)
 ├─ server/                    # ⚠️ server-only (never imported by client / barrel)
-│  └─ game-hub.ts             # in-memory SSE pub/sub hub: host state + event phase + subscribers + aggregated leaderboard + live presence headcount (refcounted per device)
+│  ├─ game-hub.ts             # in-memory SSE pub/sub hub: host state + event phase + subscribers + aggregated leaderboard + live presence headcount (refcounted per device)
+│  └─ db/                     # Postgres persistence (Drizzle) — Nov event
+│     ├─ schema.ts            # attendees table (email-unique; seat + goals jsonb; checked_in_at)
+│     ├─ index.ts             # lazy getDb() (null when DATABASE_URL unset; Render TLS)
+│     └─ attendees.ts         # upsertAttendee (by email; id-collision retry)
 ├─ types/
 │  └─ index.ts                # shared TS types (Attendee, ScheduleItem, GameSession, GameSessionState, ScoreEntry, …)
 └─ data/
@@ -374,15 +383,35 @@ Several post-demo extensions are now in place: realtime host→attendee control,
 shared live leaderboard, Navi voice, **attendee onboarding**, and a
 **host-driven live event journey** (the last two are detailed first, below).
 
-**Attendee onboarding (self-service identity).** New visitors are gated behind a
-Navi-led welcome (`src/components/navigator/welcome-gate.tsx`) that asks their
-name and shows an **auto-allocated seat**; the entered name + seat then drive the
-navigator persona (home/schedule/lobby/status) **and** the shared-leaderboard
-handle — replacing `MOCK_ATTENDEE`. Identity lives in
-`src/utils/player-identity.ts` (`usePlayerIdentity`, `completeOnboarding`,
-`attendeeFromIdentity`; seat pools in `src/constants/player.ts`), persisted
-per-device via `useSyncExternalStore` (SSR-safe). `identity.onboarded` gates the
-app; `identity.id === ""` means "not loaded yet".
+**Attendee onboarding → registration (Nov event, Phase 1).** New visitors are
+gated behind a Navi-led welcome (`src/components/navigator/welcome-gate.tsx`) in
+**two steps**: name + **corporate email** (capture-only, never verified), then
+**learning goals** (preset chips capped at `REGISTRATION_LIMITS.maxGoals` + a
+free-text goal — these later drive the personalized AI session summaries). It
+also shows the **auto-allocated seat**. Submitting calls
+`completeRegistration()` (`src/utils/player-identity.ts`), which POSTs to
+**`/api/register`** — the server **upserts by email** (the canonical identity)
+into Postgres and the client adopts the returned record, so a returning attendee
+re-registering on a new device recovers their original id + seat (and with them
+their leaderboard/presence identity). On a failed request the gate shows an
+inline error + retry; with no `DATABASE_URL` the server accepts the registration
+unpersisted (local-dev fallback). Name + seat still drive the navigator persona
+(home/schedule/lobby/status) **and** the shared-leaderboard handle. Identity
+(now incl. `email` + `goals`) persists per-device via `useSyncExternalStore`
+(SSR-safe); `identity.onboarded` gates the app; `identity.id === ""` means "not
+loaded yet". Copy/limits in `src/constants/registration.ts`; validation/shaping
+helpers in `src/utils/registration.ts` (shared by gate + API route).
+
+**Database (Postgres + Drizzle, server-only).** `src/server/db/` holds the
+schema (`attendees`: email-unique, seat + goals jsonb, `checked_in_at` for the
+Phase-2 attendance stamp), a lazy `getDb()` client (null when `DATABASE_URL` is
+unset → callers degrade gracefully; TLS auto-enabled for `*.render.com` hosts),
+and the attendee store (`upsertAttendee` — keeps the device id as row id when
+free, retries with a server id on collision). Like `game-hub.ts`, **never
+import it from client code / the barrels.** Schema changes apply with
+`npm run db:push` (drizzle-kit; loads `.env.local`). Local dev:
+`createdb ihhh_dev` + `DATABASE_URL=postgres://localhost:5432/ihhh_dev`;
+production: a Render Postgres instance (Internal URL on the web service).
 
 **Host-driven live event journey.** The current `EventPhase` is now shared live
 state over SSE (same hub as the game), defaulting to **phase 1 (Registered)**.
@@ -550,7 +579,22 @@ a second attendee live-updates both to "2", and closing it drops back to "1").
 device and `/` + `/game/play` on each attendee's phone** (any network). Locally,
 two browser windows work the same.
 
-## Status — demo complete 🎉
+## Nov 2026 event — in progress
+
+Client approved the June MVP; the ticket re-opened for the **Nov 2026 event**
+with 4 required features (Notion task 444): **1) Registration** (corporate
+email + learning goals), **2) Virus Game roster** (all registered attendees with
+scores; doubles as attendance), **3) Speaker transcripts** (STT per speaker + AI
+per-guest summaries keyed to learning goals, editable + WhatsApp share), **4)
+Phone notifications** (in-app + PWA push). Decisions: email is capture-only,
+one host device records speakers, `wa.me` share links (no WhatsApp API).
+
+Build order: **Phase 1 — registration + Postgres (✅ done, see above)** ·
+Phase 2 — roster/attendance + persistent scores · Phase 3 — sessions + STT
+(ElevenLabs Scribe) · Phase 4 — AI summaries (Claude) + WhatsApp share ·
+Phase 5 — PWA + Web Push · Phase 6 — hardening/deploy.
+
+## Status — June demo complete 🎉
 
 All **5 demo screens are built** (see the scope table above), plus **cross-device
 realtime** host→attendee sync (SSE, Render-ready), a **shared live leaderboard**

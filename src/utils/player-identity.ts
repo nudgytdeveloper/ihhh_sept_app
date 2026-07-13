@@ -11,9 +11,11 @@ import {
   SEAT_TABLE_COUNT,
   SEAT_ZONES,
 } from "@/constants/player";
+import { EMPTY_LEARNING_GOALS, REGISTER_API_PATH } from "@/constants/registration";
 import { RegistrationStatus, SeatStatus } from "@/constants/statuses";
 import { getInitials } from "@/utils/format";
-import type { Attendee, SeatInfo } from "@/types";
+import { normalizeEmail } from "@/utils/registration";
+import type { Attendee, LearningGoals, RegisteredAttendee, SeatInfo } from "@/types";
 
 /**
  * Per-device attendee identity for the Event Navigator.
@@ -25,7 +27,7 @@ import type { Attendee, SeatInfo } from "@/types";
  * (name + seat on the home/schedule/status cards) and the shared leaderboard.
  *
  * Bound to components via `usePlayerIdentity()` (useSyncExternalStore → SSR-safe,
- * no hydration mismatch). `completeOnboarding()` updates it reactively.
+ * no hydration mismatch). `completeRegistration()` updates it reactively.
  */
 
 export interface PlayerIdentity {
@@ -34,8 +36,19 @@ export interface PlayerIdentity {
   name: string;
   /** Auto-allocated seat (assigned on first visit). */
   seat: SeatInfo;
-  /** True once the attendee has completed the welcome (entered their name). */
+  /** True once the attendee has completed the welcome (registered). */
   onboarded: boolean;
+  /** Corporate email entered at registration ("" until registered). */
+  email: string;
+  /** Learning goals set at registration (empty until registered). */
+  goals: LearningGoals;
+}
+
+/** What the welcome gate submits to register this attendee. */
+export interface RegistrationDetails {
+  name: string;
+  email: string;
+  goals: LearningGoals;
 }
 
 function readStored(key: string): string | null {
@@ -105,7 +118,14 @@ const PLACEHOLDER_SEAT: SeatInfo = { status: SeatStatus.Unassigned };
  */
 export function getPlayerIdentity(): PlayerIdentity {
   if (typeof window === "undefined") {
-    return { id: "", name: PLAYER_NAME_FALLBACK, seat: PLACEHOLDER_SEAT, onboarded: false };
+    return {
+      id: "",
+      name: PLAYER_NAME_FALLBACK,
+      seat: PLACEHOLDER_SEAT,
+      onboarded: false,
+      email: "",
+      goals: EMPTY_LEARNING_GOALS,
+    };
   }
 
   let id = readStored(PLAYER_STORAGE_KEYS.id);
@@ -122,8 +142,23 @@ export function getPlayerIdentity(): PlayerIdentity {
 
   const seat = readSeat();
   const onboarded = readStored(PLAYER_STORAGE_KEYS.onboarded) === ONBOARDED_FLAG;
+  const email = readStored(PLAYER_STORAGE_KEYS.email) ?? "";
+  const goals = readGoals();
 
-  return { id, name, seat, onboarded };
+  return { id, name, seat, onboarded, email, goals };
+}
+
+function readGoals(): LearningGoals {
+  const raw = readStored(PLAYER_STORAGE_KEYS.goals);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as LearningGoals;
+      if (parsed && Array.isArray(parsed.selected)) return parsed;
+    } catch {
+      /* fall through to the empty value */
+    }
+  }
+  return EMPTY_LEARNING_GOALS;
 }
 
 /** Build the attendee persona (name, initials, seat, check-in) from an identity. */
@@ -147,6 +182,8 @@ const SERVER_IDENTITY: PlayerIdentity = {
   name: PLAYER_NAME_FALLBACK,
   seat: PLACEHOLDER_SEAT,
   onboarded: false,
+  email: "",
+  goals: EMPTY_LEARNING_GOALS,
 };
 /** Cached so getSnapshot returns a stable reference (required by the store). */
 let cached: PlayerIdentity | null = null;
@@ -171,17 +208,55 @@ function emit(): void {
 }
 
 /**
- * Finish onboarding: persist the attendee's entered name + the onboarded flag and
- * notify subscribers so the welcome gate gives way to the navigator. A blank name
- * keeps the existing auto handle.
+ * Register the attendee and finish onboarding. Posts the details to
+ * `/api/register` (which upserts by email — the canonical identity), then adopts
+ * the server's record: a returning attendee re-registering on a new device gets
+ * their original id + seat back, so their score history and presence follow
+ * them. Persists everything + the onboarded flag and notifies subscribers so
+ * the welcome gate gives way to the navigator.
+ *
+ * Throws on a failed request (server unreachable / rejected) — the gate shows
+ * the error and lets the attendee retry. When the server has no database
+ * configured it still accepts the registration (unpersisted local-dev mode).
  */
-export function completeOnboarding(name: string): void {
+export async function completeRegistration(details: RegistrationDetails): Promise<void> {
   if (typeof window === "undefined") return;
   const current = getSnapshot();
-  const finalName = name.trim() || current.name;
-  writeStored(PLAYER_STORAGE_KEYS.name, finalName);
+  const name = details.name.trim() || current.name;
+  const email = normalizeEmail(details.email);
+
+  const response = await fetch(REGISTER_API_PATH, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      playerId: current.id,
+      name,
+      email,
+      goals: details.goals,
+      seat: current.seat,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Registration failed (${response.status})`);
+  }
+  const { attendee } = (await response.json()) as { attendee: RegisteredAttendee };
+
+  const id = attendee.id || current.id;
+  const seat = attendee.seat ?? current.seat;
+  writeStored(PLAYER_STORAGE_KEYS.id, id);
+  writeStored(PLAYER_STORAGE_KEYS.name, attendee.name || name);
+  writeStored(PLAYER_STORAGE_KEYS.seat, JSON.stringify(seat));
+  writeStored(PLAYER_STORAGE_KEYS.email, attendee.email || email);
+  writeStored(PLAYER_STORAGE_KEYS.goals, JSON.stringify(attendee.goals));
   writeStored(PLAYER_STORAGE_KEYS.onboarded, ONBOARDED_FLAG);
-  cached = { ...current, name: finalName, onboarded: true };
+  cached = {
+    id,
+    name: attendee.name || name,
+    seat,
+    onboarded: true,
+    email: attendee.email || email,
+    goals: attendee.goals,
+  };
   emit();
 }
 

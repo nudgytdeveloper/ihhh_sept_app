@@ -11,6 +11,27 @@ export interface SeatInfo {
   seat?: string;
 }
 
+/**
+ * Learning goals an attendee sets at registration: preset picks + an optional
+ * free-text goal. Feeds the personalized AI session summaries.
+ */
+export interface LearningGoals {
+  selected: string[];
+  custom: string;
+}
+
+/**
+ * A registered attendee as stored server-side (keyed by corporate email) and
+ * returned by `/api/register`. Distinct from `Attendee` (the local UI persona).
+ */
+export interface RegisteredAttendee {
+  id: string;
+  name: string;
+  email: string;
+  seat: SeatInfo | null;
+  goals: LearningGoals;
+}
+
 /** A single event attendee (the current user, in the demo). */
 export interface Attendee {
   id: string;
