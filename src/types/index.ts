@@ -32,6 +32,31 @@ export interface RegisteredAttendee {
   goals: LearningGoals;
 }
 
+/**
+ * One line of the host roster: a registered attendee with their attendance
+ * mark and persisted best game score (as served by `/api/roster`).
+ */
+export interface RosterEntry {
+  id: string;
+  name: string;
+  email: string;
+  seat: SeatInfo | null;
+  goals: LearningGoals;
+  /** ISO timestamps (JSON-serialized). */
+  registeredAt: string;
+  checkedInAt: string | null;
+  /** Best virus-game score across the event (null = hasn't played yet). */
+  score: number | null;
+  /** Connected to the live event stream right now. */
+  online: boolean;
+}
+
+/** `/api/roster` payload. `available` is false when no database is configured. */
+export interface RosterResponse {
+  available: boolean;
+  roster: RosterEntry[];
+}
+
 /** A single event attendee (the current user, in the demo). */
 export interface Attendee {
   id: string;

@@ -161,13 +161,15 @@ src/
 │  │     ├─ lobby/page.tsx    # Screen 3  (/game/lobby)
 │  │     └─ play/page.tsx     # Screen 4  (/game/play)
 │  ├─ host/
-│  │  ├─ layout.tsx           # host control-room shell
-│  │  └─ page.tsx             # Screen 5  (/host)
+│  │  ├─ layout.tsx           # host control-room shell (+ HostNav tabs: Control panel / Roster)
+│  │  ├─ page.tsx             # Screen 5  (/host)
+│  │  └─ roster/page.tsx      # host roster / attendance list (/host/roster, Nov Phase 2)
 │  └─ api/
 │     ├─ game/                # realtime SSE endpoints (server route handlers)
-│     │  ├─ stream/route.ts   # SSE stream — host + attendees subscribe (phase + state + leaderboard + presence); attendees pass ?playerId for the headcount
-│     │  └─ publish/route.ts  # host POSTs phase/state/reminders; attendees POST scores (fan-out)
+│     │  ├─ stream/route.ts   # SSE stream — host + attendees subscribe (phase + state + leaderboard + presence); attendees pass ?playerId for the headcount + check-in stamp
+│     │  └─ publish/route.ts  # host POSTs phase/state/reminders; attendees POST scores (fan-out + best-score write-through to Postgres)
 │     ├─ register/route.ts    # attendee registration: upsert by corporate email → Postgres (graceful no-DB fallback)
+│     ├─ roster/route.ts      # host roster: attendees ⋈ best scores + online flags ({available:false} when no DB)
 │     └─ voice/route.ts       # Navi cloud TTS: POST a line → ElevenLabs (server-only key) → MP3; cached, 501 when unconfigured
 ├─ components/
 │  ├─ ui/                     # shadcn/ui primitives
@@ -184,6 +186,7 @@ src/
 │  ├─ voice.ts                # VOICE_CONFIG, VOICE_PREF, VOICE_STORAGE_KEY + VoiceProvider, VOICE_PROVIDER, VOICE_API_PATH, ELEVENLABS_CONFIG (Navi voice)
 │  ├─ player.ts               # attendee identity: storage keys, handle pools, seat-allocation pools
 │  ├─ registration.ts         # RegistrationStep, LEARNING_GOAL_PRESETS, REGISTRATION_LIMITS, REGISTER_API_PATH
+│  ├─ roster.ts               # ROSTER_API_PATH, ROSTER_REFRESH_MS, CSV filename/headers (host roster)
 │  └─ index.ts                # barrel
 ├─ utils/                     # ⚠️ all reusable functions live here (see rules)
 │  ├─ format.ts               # formatCountdown, formatScore, getInitials, template
@@ -195,15 +198,18 @@ src/
 │  ├─ navi-voice.ts           # speakLine (ElevenLabs /api/voice → MP3, else Web Speech; auto-fallback) + useNaviVoice store
 │  ├─ player-identity.ts      # per-device identity (usePlayerIdentity, completeRegistration, attendeeFromIdentity)
 │  ├─ registration.ts         # email validation/normalization + learning-goal shaping (shared by gate + /api/register)
+│  ├─ csv.ts                  # generic CSV helpers (toCsvCell, buildCsv, downloadCsv)
+│  ├─ roster.ts               # roster shaping (formatSeatLabel/GoalsLabel, filterRoster, summarizeRoster, rosterToCsv)
 │  └─ index.ts                # barrel
 ├─ lib/
 │  └─ utils.ts                # shadcn `cn()` helper ONLY (ecosystem convention)
 ├─ server/                    # ⚠️ server-only (never imported by client / barrel)
 │  ├─ game-hub.ts             # in-memory SSE pub/sub hub: host state + event phase + subscribers + aggregated leaderboard + live presence headcount (refcounted per device)
 │  └─ db/                     # Postgres persistence (Drizzle) — Nov event
-│     ├─ schema.ts            # attendees table (email-unique; seat + goals jsonb; checked_in_at)
+│     ├─ schema.ts            # attendees (email-unique; seat + goals jsonb; checked_in_at) + game_scores (best score per player)
 │     ├─ index.ts             # lazy getDb() (null when DATABASE_URL unset; Render TLS)
-│     └─ attendees.ts         # upsertAttendee (by email; id-collision retry)
+│     ├─ attendees.ts         # upsertAttendee (by email; id-collision retry) + markCheckedIn (memoized) + listRoster (⋈ scores)
+│     └─ scores.ts            # upsertBestScore (GREATEST keeps the event-best)
 ├─ types/
 │  └─ index.ts                # shared TS types (Attendee, ScheduleItem, GameSession, GameSessionState, ScoreEntry, …)
 └─ data/
@@ -590,9 +596,41 @@ Phone notifications** (in-app + PWA push). Decisions: email is capture-only,
 one host device records speakers, `wa.me` share links (no WhatsApp API).
 
 Build order: **Phase 1 — registration + Postgres (✅ done, see above)** ·
-Phase 2 — roster/attendance + persistent scores · Phase 3 — sessions + STT
-(ElevenLabs Scribe) · Phase 4 — AI summaries (Claude) + WhatsApp share ·
-Phase 5 — PWA + Web Push · Phase 6 — hardening/deploy.
+**Phase 2 — roster/attendance + persistent scores (✅ done, below)** ·
+Phase 3 — sessions + STT (ElevenLabs Scribe) · Phase 4 — AI summaries (Claude)
++ WhatsApp share · Phase 5 — PWA + Web Push · Phase 6 — hardening/deploy.
+
+**Phase 2 — roster / attendance / persistent scores (built).**
+
+- **Persistent scores.** `game_scores` (Postgres) keeps each player's **best**
+  score for the whole event: the publish route write-through persists every
+  score the hub accepts (`submitScore` now returns whether it was accepted, so
+  a locked board also blocks persistence) via `upsertBestScore`
+  (`src/server/db/scores.ts`, `GREATEST` upsert — a lower re-report never
+  downgrades). Fire-and-forget: the live board never waits on (or fails with)
+  the DB. The in-memory hub board stays the live per-round view (still cleared
+  on Lobby/reset); the DB row is the event-best the roster shows.
+- **Attendance.** A registered attendee's first SSE connect stamps
+  `checked_in_at` (`markCheckedIn` — UUID-guarded, `IS NULL`-guarded, memoized
+  per process so reconnects don't re-issue the UPDATE; the memo entry is
+  dropped on a failed UPDATE so it can retry).
+- **Roster.** `GET /api/roster` returns every registered attendee ⋈ best score
+  + `online` flag (hub `getOnlinePlayerIds()`), ordered score-desc then A–Z;
+  `{available:false}` with no DB. The host screen at **`/host/roster`**
+  (`src/components/host/roster-screen.tsx`, reached via the shared `HostNav`
+  header tabs) shows stat cards (registered / checked-in / online-now /
+  played), a searchable table (name/email filter, seat, goals, check-in badge
+  with time, best score, green online dot), auto-refreshes every
+  `ROSTER_REFRESH_MS`, and exports the attendance **CSV**
+  (`rosterToCsv`/`downloadCsv`). Note the table needs `min-w-0` on its flex
+  ancestors so `overflow-x-auto` scrolls inside the card at 430px.
+
+Verified end-to-end against a production build + real local Postgres: check-in
+stamped on first SSE connect (and only once), best-of 300/150/400 persisted as
+400, locked-board score rejected (roster kept 400), online flag true while the
+SSE connection was open and false after close, roster ordering + search filter
++ 430px no-overflow (measured `scrollWidth === innerWidth` in-browser; only
+the table scrolls, inside its own container).
 
 ## Status — June demo complete 🎉
 

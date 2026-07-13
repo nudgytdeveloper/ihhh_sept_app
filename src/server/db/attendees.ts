@@ -1,5 +1,5 @@
-import { sql } from "drizzle-orm";
-import { attendees, type AttendeeRow } from "./schema";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { attendees, gameScores, type AttendeeRow } from "./schema";
 import type { Db } from "./index";
 import type { LearningGoals, SeatInfo } from "@/types";
 
@@ -59,6 +59,61 @@ export async function upsertAttendee(db: Db, input: AttendeeUpsert): Promise<Att
     }
     throw error;
   }
+}
+
+/**
+ * Stamp the attendee's first live connection (the attendance mark). No-op for
+ * an already-checked-in attendee or a non-registered device id; memoized per
+ * process so the SSE route doesn't re-issue the UPDATE on every reconnect.
+ */
+const stampedCheckIns = new Set<string>();
+
+export async function markCheckedIn(db: Db, playerId: string): Promise<void> {
+  if (!UUID_PATTERN.test(playerId) || stampedCheckIns.has(playerId)) return;
+  stampedCheckIns.add(playerId);
+  try {
+    await db
+      .update(attendees)
+      .set({ checkedInAt: sql`now()` })
+      .where(and(eq(attendees.id, playerId), isNull(attendees.checkedInAt)));
+  } catch (error) {
+    // Allow a retry on the next connection instead of losing the stamp.
+    stampedCheckIns.delete(playerId);
+    throw error;
+  }
+}
+
+/** One roster line: a registered attendee joined with their best game score. */
+export interface RosterRecord {
+  id: string;
+  name: string;
+  email: string;
+  seat: SeatInfo | null;
+  goals: LearningGoals;
+  registeredAt: Date;
+  checkedInAt: Date | null;
+  score: number | null;
+}
+
+/**
+ * Every registered attendee with their persisted best score (the Nov-event
+ * roster / attendance list) — highest score first, then A–Z for the scoreless.
+ */
+export async function listRoster(db: Db): Promise<RosterRecord[]> {
+  return db
+    .select({
+      id: attendees.id,
+      name: attendees.name,
+      email: attendees.email,
+      seat: attendees.seat,
+      goals: attendees.goals,
+      registeredAt: attendees.createdAt,
+      checkedInAt: attendees.checkedInAt,
+      score: gameScores.score,
+    })
+    .from(attendees)
+    .leftJoin(gameScores, sql`${attendees.id}::text = ${gameScores.playerId}`)
+    .orderBy(desc(sql`COALESCE(${gameScores.score}, -1)`), asc(attendees.name));
 }
 
 /** Postgres unique violation (23505) — drizzle wraps the pg error as `cause`. */

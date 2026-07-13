@@ -5,7 +5,10 @@ import {
   publishState,
   submitScore,
 } from "@/server/game-hub";
+import { getDb } from "@/server/db";
+import { upsertBestScore } from "@/server/db/scores";
 import { RealtimeMessage } from "@/constants/realtime";
+import type { ScoreEntry } from "@/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -25,7 +28,7 @@ export async function POST(request: Request) {
   } else if (body.type === RealtimeMessage.Reminder && typeof body.reminderId === "string") {
     publishReminder(body.reminderId);
   } else if (body.type === RealtimeMessage.Score && body.entry) {
-    submitScore(body.entry);
+    if (submitScore(body.entry)) persistScore(body.entry);
   } else if (body.type === RealtimeMessage.Phase && typeof body.phase === "string") {
     publishPhase(body.phase);
   } else if (body.type === RealtimeMessage.Countdown && typeof body.seconds === "number") {
@@ -34,4 +37,17 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: "unknown message" }, { status: 400 });
   }
   return Response.json({ ok: true });
+}
+
+/**
+ * Write-through: keep the player's best score in Postgres so the roster
+ * survives restarts and round resets. Fire-and-forget — the live board must
+ * never wait on (or fail with) the database; no DB configured is a no-op.
+ */
+function persistScore(entry: ScoreEntry): void {
+  const db = getDb();
+  if (!db) return;
+  void upsertBestScore(db, entry).catch((error) => {
+    console.error("score persist failed", error);
+  });
 }

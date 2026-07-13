@@ -102,17 +102,21 @@ export function publishState(state: GameSessionState): void {
   broadcast(RealtimeMessage.State, state);
 }
 
-/** Attendee reported a live score → aggregate + fan the board out to everyone. */
-export function submitScore(entry: ScoreEntry): void {
+/**
+ * Attendee reported a live score → aggregate + fan the board out to everyone.
+ * Returns whether the score was accepted (rejected while the board is locked
+ * or malformed) so the publish route knows to persist it.
+ */
+export function submitScore(entry: ScoreEntry): boolean {
   // Frozen once the host locks the leaderboard for final tally.
-  if (currentState?.locked) return;
+  if (currentState?.locked) return false;
   if (
     !entry ||
     typeof entry.playerId !== "string" ||
     typeof entry.name !== "string" ||
     typeof entry.score !== "number"
   ) {
-    return;
+    return false;
   }
   scores.set(entry.playerId, {
     playerId: entry.playerId,
@@ -120,6 +124,12 @@ export function submitScore(entry: ScoreEntry): void {
     score: entry.score,
   });
   broadcast(RealtimeMessage.Leaderboard, getLeaderboard());
+  return true;
+}
+
+/** Device playerIds currently connected — the roster's "online now" dots. */
+export function getOnlinePlayerIds(): string[] {
+  return [...presence.keys()];
 }
 
 /** Host advanced the event journey → store it + fan out to everyone. */

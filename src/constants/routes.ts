@@ -14,6 +14,8 @@ export const ROUTES = {
   GAME_PLAY: "/game/play",
   /** Screen 5 — Host Game Control Panel */
   HOST: "/host",
+  /** Host roster / attendance list (Nov-event Phase 2) */
+  HOST_ROSTER: "/host/roster",
 } as const;
 
 export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];

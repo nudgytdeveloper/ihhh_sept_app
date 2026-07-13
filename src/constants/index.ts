@@ -11,3 +11,4 @@ export * from "./realtime";
 export * from "./voice";
 export * from "./player";
 export * from "./registration";
+export * from "./roster";

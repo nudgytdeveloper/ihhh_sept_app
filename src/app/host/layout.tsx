@@ -1,6 +1,7 @@
 import { SlidersHorizontal } from "lucide-react";
 import { APP_NAME, EVENT_NAME } from "@/constants/app";
 import { GAME_NAME } from "@/constants/game";
+import { HostNav } from "@/components/host/host-nav";
 
 /**
  * Host-facing shell (control-room feel) — distinct from the attendee shell.
@@ -26,6 +27,7 @@ export default function HostLayout({
               </p>
             </div>
           </div>
+          <HostNav />
         </div>
       </header>
 

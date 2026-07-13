@@ -5,6 +5,8 @@ import {
   getLeaderboard,
   getPresenceCount,
 } from "@/server/game-hub";
+import { getDb } from "@/server/db";
+import { markCheckedIn } from "@/server/db/attendees";
 import { RealtimeMessage } from "@/constants/realtime";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +20,16 @@ export const runtime = "nodejs";
  */
 export async function GET(request: Request) {
   const playerId = new URL(request.url).searchParams.get("playerId") ?? undefined;
+  // Attendance: a registered attendee's first live connection is the check-in.
+  // Fire-and-forget — the stream must never wait on (or fail with) the database.
+  if (playerId) {
+    const db = getDb();
+    if (db) {
+      void markCheckedIn(db, playerId).catch((error) => {
+        console.error("check-in stamp failed", error);
+      });
+    }
+  }
   const encoder = new TextEncoder();
   let teardown = () => {};
 

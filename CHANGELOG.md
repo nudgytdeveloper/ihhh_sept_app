@@ -2,6 +2,13 @@
 
 ## 2026-07-13
 
+### Added
+- Persistent game scores: `game_scores` table keeps each player's best score, written through from live score publishes (skipped while the host has the board locked) — survives server restarts and round resets
+- Attendance stamping: a registered attendee's first SSE connection sets `checked_in_at` (memoized per process)
+- `/api/roster` — every registered attendee with attendance mark, best score, and live online flag
+- Host roster screen at `/host/roster`: stat cards (registered / checked in / online / played), searchable attendee table, auto-refresh, CSV export; host header nav tabs (Control panel / Roster)
+- Roster constants (`src/constants/roster.ts`), CSV + roster helpers (`src/utils/csv.ts`, `src/utils/roster.ts`), `RosterEntry`/`RosterResponse` types, `ROUTES.HOST_ROSTER`
+
 ### Fixed
 - Render deploy failure (`ERR_PNPM_OUTDATED_LOCKFILE`): synced `pnpm-lock.yaml` with the Phase 1 dependencies added via npm
 

@@ -1,4 +1,4 @@
-import { jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import type { LearningGoals, SeatInfo } from "@/types";
 
 /**
@@ -29,3 +29,19 @@ export const attendees = pgTable("attendees", {
 });
 
 export type AttendeeRow = typeof attendees.$inferSelect;
+
+/**
+ * Best virus-game score per player, written through from the live score
+ * publishes so the roster survives server restarts and round resets. Keyed by
+ * the device playerId (equal to the attendee's row id once registered — kept
+ * as text so a legacy non-UUID device id can still record a score).
+ */
+export const gameScores = pgTable("game_scores", {
+  playerId: text("player_id").primaryKey(),
+  /** Display handle at the time of the score (fallback when unregistered). */
+  name: text("name").notNull(),
+  score: integer("score").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type GameScoreRow = typeof gameScores.$inferSelect;
