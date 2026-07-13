@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-07-13
+
+### Fixed
+- Render deploy failure (`ERR_PNPM_OUTDATED_LOCKFILE`): synced `pnpm-lock.yaml` with the Phase 1 dependencies added via npm
+
 ## 2026-07-12
 
 ### Added
