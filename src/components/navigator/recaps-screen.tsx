@@ -122,6 +122,7 @@ export function RecapsScreen() {
               session={session}
               summary={summaryBySession.get(session.id) ?? null}
               attendeeId={attendeeId}
+              attendeeName={identity.name}
               goals={identity.goals}
               onSummary={handleSummary}
             />

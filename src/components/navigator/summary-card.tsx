@@ -26,12 +26,14 @@ export function SummaryCard({
   session,
   summary,
   attendeeId,
+  attendeeName,
   goals,
   onSummary,
 }: {
   session: Session;
   summary: Summary | null;
   attendeeId: string;
+  attendeeName: string;
   goals: LearningGoals;
   onSummary: (summary: Summary) => void;
 }) {
@@ -47,7 +49,7 @@ export function SummaryCard({
         const response = await fetch(SUMMARIES_API_PATH, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId: session.id, attendeeId, goals, regenerate }),
+          body: JSON.stringify({ sessionId: session.id, attendeeId, name: attendeeName, goals, regenerate }),
         });
         if (response.status === 501) {
           toast.error(`${AVATAR_NAME}'s AI recaps aren't switched on yet.`);
@@ -63,7 +65,7 @@ export function SummaryCard({
         setBusy(false);
       }
     },
-    [session.id, attendeeId, goals, onSummary],
+    [session.id, attendeeId, attendeeName, goals, onSummary],
   );
 
   const startEdit = useCallback(() => {

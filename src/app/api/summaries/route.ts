@@ -77,16 +77,19 @@ export async function POST(request: Request) {
       return Response.json({ ok: false, error: "session has no transcript yet" }, { status: 400 });
     }
 
-    // Prefer the attendee's stored goals; fall back to goals sent by the client.
+    // Prefer the attendee's stored goals/name; fall back to what the client sent.
     const attendee = await getAttendeeById(db, attendeeId);
     const goals: LearningGoals =
       attendee?.goals ?? sanitizeLearningGoals(body?.goals) ?? EMPTY_LEARNING_GOALS;
+    const attendeeName =
+      attendee?.name ?? (typeof body?.name === "string" ? body.name : "");
 
     let content: string;
     try {
       content = await generateSummary(apiKey, {
         title: session.title,
         speaker: session.speaker,
+        attendeeName,
         goals,
         transcript: session.transcript,
       });

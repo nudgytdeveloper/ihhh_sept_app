@@ -17,7 +17,7 @@
 - Roster constants (`src/constants/roster.ts`), CSV + roster helpers (`src/utils/csv.ts`, `src/utils/roster.ts`), `RosterEntry`/`RosterResponse` types, `ROUTES.HOST_ROSTER`
 
 ### Changed
-- AI recap provider swapped from Claude (Anthropic) to Google Gemini (`gemini-2.5-flash`, `GEMINI_API_KEY`) — the client has no Anthropic key
+- AI recap provider swapped from Claude (Anthropic) to Google Gemini (`gemini-2.5-flash`, `GEMINI_API_KEY`) — the client has no Anthropic key; recap greets the attendee by first name (no bracketed placeholders)
 
 ### Fixed
 - Render deploy failure (`ERR_PNPM_OUTDATED_LOCKFILE`): synced `pnpm-lock.yaml` with the Phase 1 dependencies added via npm

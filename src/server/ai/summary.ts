@@ -11,15 +11,17 @@ import type { LearningGoals } from "@/types";
 const SYSTEM_PROMPT = `You are the IHHH 2026 event companion — a warm, concise event host who writes a personalized recap of a conference talk for a single attendee, tailored to the learning goals they set at registration.
 
 Write in PLAIN TEXT only (no markdown symbols like # or **). Structure it exactly as:
-1. A 1-2 sentence recap of what the talk covered.
+1. A 1-2 sentence recap of what the talk covered. If the attendee's first name is given, you may open by addressing them by that name; otherwise do not use a name.
 2. A line "Key points:" then 2-4 bullets, each starting with "• ".
 3. A line "Your action items:" then 2-3 concrete, personal bullets (each starting with "• ") that connect the talk to this attendee's goals.
 
-Keep the whole thing under 180 words, friendly and specific. Ground everything in the transcript — do not invent facts or claims the speaker did not make. If the transcript is too short or off-topic to cover a goal, focus the action items on what the talk actually offered.`;
+Keep the whole thing under 180 words, friendly and specific. Ground everything in the transcript — do not invent facts or claims the speaker did not make. If the transcript is too short or off-topic to cover a goal, focus the action items on what the talk actually offered. NEVER output placeholder text in brackets like [Attendee Name] or [Name] — if you don't have a value, simply leave it out.`;
 
 export interface SummaryInput {
   title: string;
   speaker: string;
+  /** The attendee's display name (its first word is used to greet them). */
+  attendeeName?: string;
   goals: LearningGoals;
   transcript: string;
 }
@@ -38,7 +40,9 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
  */
 export async function generateSummary(apiKey: string, input: SummaryInput): Promise<string> {
   const transcript = input.transcript.slice(0, SUMMARY_CONFIG.maxTranscriptChars);
+  const firstName = (input.attendeeName ?? "").trim().split(/\s+/)[0] ?? "";
   const userPrompt = `Talk: "${input.title}" by ${input.speaker}
+Attendee's first name: ${firstName || "unknown (do not use a name)"}
 This attendee's learning goals: ${goalsLine(input.goals)}
 
 Transcript:
