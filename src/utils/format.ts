@@ -13,6 +13,13 @@ export function formatScore(score: number): string {
   return score.toLocaleString("en-US");
 }
 
+/** Short local clock time for an ISO timestamp, e.g. "9:41 AM" ("" if invalid). */
+export function formatClockTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 /** Derive up-to-two-letter initials from a name (e.g. "Ada Lovelace" → "AL"). */
 export function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);

@@ -3,6 +3,10 @@
 ## 2026-07-13
 
 ### Added
+- Speaker sessions + live speech-to-text (Nov Phase 3): `sessions` table + `/api/sessions` CRUD (`[id]` PATCH/DELETE) and `/api/transcribe` (ElevenLabs Scribe proxy, reuses `ELEVENLABS_API_KEY`, 501 when unset)
+- Host Sessions screen at `/host/sessions`: create a session per speaker, record with a live-growing transcript, edit + save the transcript; third host nav tab (Sessions)
+- Two STT engines behind one recorder (mirrors the voice provider): free Web Speech `SpeechRecognition` by default, ElevenLabs Scribe via `NEXT_PUBLIC_STT_PROVIDER=scribe`; `useSessionRecorder` hook handles both
+- Sessions constants/helpers (`src/constants/sessions.ts`, `src/utils/sessions.ts`), CSV-free session utils, `Session`/`SessionListResponse`/`TranscribeResponse` types, `ROUTES.HOST_SESSIONS`, `formatClockTime`, ambient `SpeechRecognition` types
 - Persistent game scores: `game_scores` table keeps each player's best score, written through from live score publishes (skipped while the host has the board locked) — survives server restarts and round resets
 - Attendance stamping: a registered attendee's first SSE connection sets `checked_in_at` (memoized per process)
 - `/api/roster` — every registered attendee with attendance mark, best score, and live online flag

@@ -16,6 +16,8 @@ export const ROUTES = {
   HOST: "/host",
   /** Host roster / attendance list (Nov-event Phase 2) */
   HOST_ROSTER: "/host/roster",
+  /** Host speaker sessions / transcripts (Nov-event Phase 3) */
+  HOST_SESSIONS: "/host/sessions",
 } as const;
 
 export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];

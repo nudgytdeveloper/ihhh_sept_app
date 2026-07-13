@@ -1,4 +1,5 @@
 import { integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { SessionStatus } from "@/constants/sessions";
 import type { LearningGoals, SeatInfo } from "@/types";
 
 /**
@@ -45,3 +46,21 @@ export const gameScores = pgTable("game_scores", {
 });
 
 export type GameScoreRow = typeof gameScores.$inferSelect;
+
+/**
+ * One recorded speaker session (Nov-event Phase 3). The transcript is captured
+ * live by ElevenLabs Scribe (one host device records) and grows one segment at
+ * a time; `status` tracks the recording lifecycle. Later feeds the per-attendee
+ * AI summaries keyed to each attendee's learning goals.
+ */
+export const sessions = pgTable("sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: text("title").notNull(),
+  speaker: text("speaker").notNull(),
+  status: text("status").$type<SessionStatus>().notNull().default(SessionStatus.Scheduled),
+  transcript: text("transcript").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type SessionRow = typeof sessions.$inferSelect;

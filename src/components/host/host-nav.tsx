@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, SlidersHorizontal } from "lucide-react";
+import { ClipboardList, Mic, SlidersHorizontal } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
   { href: ROUTES.HOST, label: "Control panel", icon: SlidersHorizontal },
   { href: ROUTES.HOST_ROSTER, label: "Roster", icon: ClipboardList },
+  { href: ROUTES.HOST_SESSIONS, label: "Sessions", icon: Mic },
 ] as const;
 
 /** Header tabs switching between the host's control panel and the roster. */

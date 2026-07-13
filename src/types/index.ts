@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import type { EventPhase } from "@/constants/phases";
 import type { RegistrationStatus, SeatStatus } from "@/constants/statuses";
 import type { GameStatus, BossShape } from "@/constants/game";
+import type { SessionStatus } from "@/constants/sessions";
 
 /** Where an attendee is sitting. */
 export interface SeatInfo {
@@ -132,6 +133,33 @@ export interface GameSessionState {
   locked: boolean;
   /** Name of the announced winner, once the host announces one. */
   winnerName: string | null;
+}
+
+/**
+ * One recorded speaker session (Nov-event Phase 3), as served by `/api/sessions`.
+ * The transcript is captured live by ElevenLabs Scribe and later feeds the
+ * per-attendee AI summaries.
+ */
+export interface Session {
+  id: string;
+  title: string;
+  speaker: string;
+  status: SessionStatus;
+  transcript: string;
+  /** ISO timestamps (JSON-serialized). */
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** `/api/sessions` list payload. `available` is false when no database is configured. */
+export interface SessionListResponse {
+  available: boolean;
+  sessions: Session[];
+}
+
+/** `/api/transcribe` payload — the recognized text for one uploaded audio segment. */
+export interface TranscribeResponse {
+  text: string;
 }
 
 /** A proactive nudge the avatar surfaces on the navigator home. */

@@ -19,3 +19,5 @@ export * from "./player-identity";
 export * from "./registration";
 export * from "./csv";
 export * from "./roster";
+export * from "./sessions";
+export * from "./use-session-recorder";

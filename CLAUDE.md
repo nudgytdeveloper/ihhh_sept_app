@@ -161,15 +161,18 @@ src/
 │  │     ├─ lobby/page.tsx    # Screen 3  (/game/lobby)
 │  │     └─ play/page.tsx     # Screen 4  (/game/play)
 │  ├─ host/
-│  │  ├─ layout.tsx           # host control-room shell (+ HostNav tabs: Control panel / Roster)
+│  │  ├─ layout.tsx           # host control-room shell (+ HostNav tabs: Control panel / Roster / Sessions)
 │  │  ├─ page.tsx             # Screen 5  (/host)
-│  │  └─ roster/page.tsx      # host roster / attendance list (/host/roster, Nov Phase 2)
+│  │  ├─ roster/page.tsx      # host roster / attendance list (/host/roster, Nov Phase 2)
+│  │  └─ sessions/page.tsx    # host speaker sessions / transcripts (/host/sessions, Nov Phase 3)
 │  └─ api/
 │     ├─ game/                # realtime SSE endpoints (server route handlers)
 │     │  ├─ stream/route.ts   # SSE stream — host + attendees subscribe (phase + state + leaderboard + presence); attendees pass ?playerId for the headcount + check-in stamp
 │     │  └─ publish/route.ts  # host POSTs phase/state/reminders; attendees POST scores (fan-out + best-score write-through to Postgres)
 │     ├─ register/route.ts    # attendee registration: upsert by corporate email → Postgres (graceful no-DB fallback)
 │     ├─ roster/route.ts      # host roster: attendees ⋈ best scores + online flags ({available:false} when no DB)
+│     ├─ sessions/route.ts    # speaker sessions: GET list / POST create; [id]/route.ts GET/PATCH/DELETE (Phase 3)
+│     ├─ transcribe/route.ts  # STT: POST audio → ElevenLabs Scribe (reuses ELEVENLABS_API_KEY) → {text}; 501 when unset; GET {configured}
 │     └─ voice/route.ts       # Navi cloud TTS: POST a line → ElevenLabs (server-only key) → MP3; cached, 501 when unconfigured
 ├─ components/
 │  ├─ ui/                     # shadcn/ui primitives
@@ -187,6 +190,7 @@ src/
 │  ├─ player.ts               # attendee identity: storage keys, handle pools, seat-allocation pools
 │  ├─ registration.ts         # RegistrationStep, LEARNING_GOAL_PRESETS, REGISTRATION_LIMITS, REGISTER_API_PATH
 │  ├─ roster.ts               # ROSTER_API_PATH, ROSTER_REFRESH_MS, CSV filename/headers (host roster)
+│  ├─ sessions.ts             # SessionStatus, SESSION_STATUS_META, RECORDING_CONFIG, SCRIBE_CONFIG, SttProvider/STT_PROVIDER, RecorderState, API paths
 │  └─ index.ts                # barrel
 ├─ utils/                     # ⚠️ all reusable functions live here (see rules)
 │  ├─ format.ts               # formatCountdown, formatScore, getInitials, template
@@ -200,18 +204,22 @@ src/
 │  ├─ registration.ts         # email validation/normalization + learning-goal shaping (shared by gate + /api/register)
 │  ├─ csv.ts                  # generic CSV helpers (toCsvCell, buildCsv, downloadCsv)
 │  ├─ roster.ts               # roster shaping (formatSeatLabel/GoalsLabel, filterRoster, summarizeRoster, rosterToCsv)
+│  ├─ sessions.ts             # session sanitize/validate (title/speaker/transcript), appendSegment, countWords, pickRecordingMime, isSessionStatus
+│  ├─ use-session-recorder.ts # useSessionRecorder — live STT recorder (Web Speech | Scribe MediaRecorder segments) → onSegment
 │  └─ index.ts                # barrel
 ├─ lib/
 │  └─ utils.ts                # shadcn `cn()` helper ONLY (ecosystem convention)
 ├─ server/                    # ⚠️ server-only (never imported by client / barrel)
 │  ├─ game-hub.ts             # in-memory SSE pub/sub hub: host state + event phase + subscribers + aggregated leaderboard + live presence headcount (refcounted per device)
 │  └─ db/                     # Postgres persistence (Drizzle) — Nov event
-│     ├─ schema.ts            # attendees (email-unique; seat + goals jsonb; checked_in_at) + game_scores (best score per player)
+│     ├─ schema.ts            # attendees + game_scores + sessions (title/speaker/status/transcript, Phase 3)
 │     ├─ index.ts             # lazy getDb() (null when DATABASE_URL unset; Render TLS)
 │     ├─ attendees.ts         # upsertAttendee (by email; id-collision retry) + markCheckedIn (memoized) + listRoster (⋈ scores)
-│     └─ scores.ts            # upsertBestScore (GREATEST keeps the event-best)
+│     ├─ scores.ts            # upsertBestScore (GREATEST keeps the event-best)
+│     └─ sessions.ts          # create/list/get/update/delete sessions + toSession DTO mapper
 ├─ types/
-│  └─ index.ts                # shared TS types (Attendee, ScheduleItem, GameSession, GameSessionState, ScoreEntry, …)
+│  ├─ index.ts                # shared TS types (Attendee, ScheduleItem, GameSession, GameSessionState, ScoreEntry, RosterEntry, Session, …)
+│  └─ speech-recognition.d.ts # ambient Web Speech API types (SpeechRecognition — not in TS DOM lib yet)
 └─ data/
    └─ event.ts                # mock demo data (attendee, schedule, leaderboard, state)
 ```
@@ -597,8 +605,51 @@ one host device records speakers, `wa.me` share links (no WhatsApp API).
 
 Build order: **Phase 1 — registration + Postgres (✅ done, see above)** ·
 **Phase 2 — roster/attendance + persistent scores (✅ done, below)** ·
-Phase 3 — sessions + STT (ElevenLabs Scribe) · Phase 4 — AI summaries (Claude)
-+ WhatsApp share · Phase 5 — PWA + Web Push · Phase 6 — hardening/deploy.
+**Phase 3 — speaker sessions + STT (✅ done, below)** · Phase 4 — AI summaries
+(Claude) + WhatsApp share · Phase 5 — PWA + Web Push · Phase 6 — hardening/deploy.
+
+**Phase 3 — speaker sessions + live STT (built).**
+
+- **Sessions.** `sessions` (Postgres): title, speaker, `status`
+  (`SessionStatus`: Scheduled → Recording → Ready), transcript.
+  `GET/POST /api/sessions` + `GET/PATCH/DELETE /api/sessions/[id]` (persistence
+  required — 503 when no DB, unlike registration's graceful fallback). Store in
+  `src/server/db/sessions.ts` (+ the `toSession` DTO mapper).
+- **Two STT engines behind one recorder** (mirrors the voice provider). The host
+  recorder (`src/components/host/session-recorder.tsx`, driven by
+  `useSessionRecorder` in `src/utils/use-session-recorder.ts`) picks its engine
+  from `STT_PROVIDER` (`NEXT_PUBLIC_STT_PROVIDER`, default `webspeech`):
+  - **Web Speech (default, free, zero-config):** the browser's
+    `SpeechRecognition` streams final results directly (no upload, no key) —
+    works locally + for a no-key demo (Chrome/Safari).
+  - **Scribe (opt-in cloud):** `MediaRecorder` captures short,
+    independently-decodable segments (stop/restart each `RECORDING_CONFIG.segmentMs`)
+    POSTed to `/api/transcribe` → ElevenLabs Scribe (reuses the **same**
+    server-only `ELEVENLABS_API_KEY` as voice; 501 when unset → the recorder
+    shows a "not configured" notice; `GET /api/transcribe` reports `{configured}`).
+
+  Each finalized chunk appends live (`appendSegment`) and the transcript is
+  persisted to the session (throttled during recording + a final flush on stop,
+  which also sets status Ready). Once stopped, the transcript is editable
+  (fix STT slips before summaries) and saved via PATCH.
+- **Host UI.** `/host/sessions` (`sessions-screen.tsx`): create a session per
+  speaker, master list ⇄ single-session recorder, reached via the third HostNav
+  tab. The transcript feeds the Phase-4 per-attendee AI summaries.
+
+**IMPORTANT — `ELEVENLABS_API_KEY` is prod-only:** it lives in Render's env, not
+local `.env.local`, so `/api/transcribe` returns 501 locally and the default
+Web Speech engine is what runs in local dev. The real Scribe audio path is
+verified in production (where the key exists), not locally. (Voice's
+`NEXT_PUBLIC_VOICE_PROVIDER=elevenlabs` is a build-time switch; the key is only
+set on Render.)
+
+Verified against a production build + real local Postgres: sessions CRUD +
+validations (incl. 400 on bad status, 404 after delete); the full live loop
+(create → record → segments append into a growing transcript → stop persists
+`{transcript, status: ready}`) driven end-to-end in-browser with a deterministic
+fake `SpeechRecognition`, confirmed persisted in the DB; manual edit → Save
+persisted; 430px no-overflow on the list AND recorder views
+(`scrollWidth === innerWidth`); no console errors.
 
 **Phase 2 — roster / attendance / persistent scores (built).**
 
