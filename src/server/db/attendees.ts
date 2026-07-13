@@ -83,6 +83,13 @@ export async function markCheckedIn(db: Db, playerId: string): Promise<void> {
   }
 }
 
+/** One attendee by id (device/player id = row id), or null. */
+export async function getAttendeeById(db: Db, id: string): Promise<AttendeeRow | null> {
+  if (!UUID_PATTERN.test(id)) return null;
+  const [row] = await db.select().from(attendees).where(eq(attendees.id, id)).limit(1);
+  return row ?? null;
+}
+
 /** One roster line: a registered attendee joined with their best game score. */
 export interface RosterRecord {
   id: string;

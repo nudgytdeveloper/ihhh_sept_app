@@ -3,6 +3,9 @@
 ## 2026-07-13
 
 ### Added
+- Personalized AI session recaps + WhatsApp share (Nov Phase 4): `summaries` table (per session × attendee, FK-cascade), `/api/summaries` (POST generate/cache — Claude via Anthropic Messages API, keyed to the attendee's learning goals; cache-hit needs no key; 501 when unset) + GET list + `[id]` PATCH edit
+- Attendee "Session recaps" screen at `/recaps` (+ home entry card): generate a recap per recorded talk, edit it, share to WhatsApp via `wa.me`; server summarizer `src/server/ai/summary.ts`
+- Summaries constants/helpers (`src/constants/summaries.ts`, `src/utils/summaries.ts`: `buildWhatsAppShareUrl`, `isSummarizable`), `Summary`/`SummaryResponse`/`SummaryListResponse` types, `ROUTES.RECAPS`, `getAttendeeById`
 - Speaker sessions + live speech-to-text (Nov Phase 3): `sessions` table + `/api/sessions` CRUD (`[id]` PATCH/DELETE) and `/api/transcribe` (ElevenLabs Scribe proxy, reuses `ELEVENLABS_API_KEY`, 501 when unset)
 - Host Sessions screen at `/host/sessions`: create a session per speaker, record with a live-growing transcript, edit + save the transcript; third host nav tab (Sessions)
 - Two STT engines behind one recorder (mirrors the voice provider): free Web Speech `SpeechRecognition` by default, ElevenLabs Scribe via `NEXT_PUBLIC_STT_PROVIDER=scribe`; `useSessionRecorder` hook handles both

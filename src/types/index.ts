@@ -162,6 +162,33 @@ export interface TranscribeResponse {
   text: string;
 }
 
+/**
+ * A personalized AI recap of one session for one attendee (Phase 4), keyed to
+ * that attendee's learning goals. Cached per (session × attendee) and editable.
+ */
+export interface Summary {
+  id: string;
+  sessionId: string;
+  attendeeId: string;
+  content: string;
+  /** True once the attendee has edited the AI-generated text. */
+  edited: boolean;
+  /** ISO timestamps (JSON-serialized). */
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** `/api/summaries` single-summary payload (generate / edit). */
+export interface SummaryResponse {
+  summary: Summary;
+}
+
+/** `/api/summaries` list payload. `available` is false with no database. */
+export interface SummaryListResponse {
+  available: boolean;
+  summaries: Summary[];
+}
+
 /** A proactive nudge the avatar surfaces on the navigator home. */
 export interface Reminder {
   id: string;

@@ -1,4 +1,13 @@
-import { integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { SessionStatus } from "@/constants/sessions";
 import type { LearningGoals, SeatInfo } from "@/types";
 
@@ -64,3 +73,28 @@ export const sessions = pgTable("sessions", {
 });
 
 export type SessionRow = typeof sessions.$inferSelect;
+
+/**
+ * A personalized AI recap of one session for one attendee (Phase 4), keyed to
+ * that attendee's learning goals. One per (session × attendee); regenerating
+ * overwrites the row, editing sets `edited`. Deleting a session cascades here.
+ */
+export const summaries = pgTable(
+  "summaries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => sessions.id, { onDelete: "cascade" }),
+    /** The attendee (device/player id = attendees.id) the recap is tailored for. */
+    attendeeId: text("attendee_id").notNull(),
+    content: text("content").notNull(),
+    /** True once the attendee has edited the AI-generated text. */
+    edited: boolean("edited").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique("summaries_session_attendee_uq").on(table.sessionId, table.attendeeId)],
+);
+
+export type SummaryRow = typeof summaries.$inferSelect;

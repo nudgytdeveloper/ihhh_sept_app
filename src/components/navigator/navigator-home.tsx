@@ -4,6 +4,7 @@ import { Reveal } from "@/components/navigator/reveal";
 import { NavigatorHero } from "@/components/navigator/navigator-hero";
 import { PhaseProgress } from "@/components/navigator/phase-progress";
 import { GamePreviewCard } from "@/components/navigator/game-preview-card";
+import { RecapsEntryCard } from "@/components/navigator/recaps-entry-card";
 import { StatusCard } from "@/components/navigator/status-card";
 import { RemindersCard } from "@/components/navigator/reminders-card";
 import {
@@ -64,10 +65,14 @@ export function NavigatorHome() {
       </Reveal>
 
       <Reveal delay={270}>
-        <StatusCard attendee={attendee} />
+        <RecapsEntryCard />
       </Reveal>
 
       <Reveal delay={360}>
+        <StatusCard attendee={attendee} />
+      </Reveal>
+
+      <Reveal delay={450}>
         <RemindersCard reminders={MOCK_REMINDERS} />
       </Reveal>
     </div>

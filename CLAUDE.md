@@ -157,6 +157,7 @@ src/
 │  │  ├─ layout.tsx
 │  │  ├─ page.tsx             # Screen 1 (/) — thin; renders navigator-home (live phase + onboarded persona)
 │  │  ├─ schedule/page.tsx    # Screen 2  (/schedule) — thin; renders schedule-screen
+│  │  ├─ recaps/page.tsx      # attendee AI session recaps (/recaps, Nov Phase 4) — thin; renders recaps-screen
 │  │  └─ game/
 │  │     ├─ lobby/page.tsx    # Screen 3  (/game/lobby)
 │  │     └─ play/page.tsx     # Screen 4  (/game/play)
@@ -173,6 +174,7 @@ src/
 │     ├─ roster/route.ts      # host roster: attendees ⋈ best scores + online flags ({available:false} when no DB)
 │     ├─ sessions/route.ts    # speaker sessions: GET list / POST create; [id]/route.ts GET/PATCH/DELETE (Phase 3)
 │     ├─ transcribe/route.ts  # STT: POST audio → ElevenLabs Scribe (reuses ELEVENLABS_API_KEY) → {text}; 501 when unset; GET {configured}
+│     ├─ summaries/route.ts   # AI recaps: POST generate/cache (Claude, per attendee goals; cache-hit needs no key) + GET list; [id] PATCH edit (Phase 4)
 │     └─ voice/route.ts       # Navi cloud TTS: POST a line → ElevenLabs (server-only key) → MP3; cached, 501 when unconfigured
 ├─ components/
 │  ├─ ui/                     # shadcn/ui primitives
@@ -191,6 +193,7 @@ src/
 │  ├─ registration.ts         # RegistrationStep, LEARNING_GOAL_PRESETS, REGISTRATION_LIMITS, REGISTER_API_PATH
 │  ├─ roster.ts               # ROSTER_API_PATH, ROSTER_REFRESH_MS, CSV filename/headers (host roster)
 │  ├─ sessions.ts             # SessionStatus, SESSION_STATUS_META, RECORDING_CONFIG, SCRIBE_CONFIG, SttProvider/STT_PROVIDER, RecorderState, API paths
+│  ├─ summaries.ts            # SUMMARY_CONFIG (Anthropic model/endpoint), SUMMARY_LIMITS, WHATSAPP_SHARE, API paths (Phase 4)
 │  └─ index.ts                # barrel
 ├─ utils/                     # ⚠️ all reusable functions live here (see rules)
 │  ├─ format.ts               # formatCountdown, formatScore, getInitials, template
@@ -206,19 +209,23 @@ src/
 │  ├─ roster.ts               # roster shaping (formatSeatLabel/GoalsLabel, filterRoster, summarizeRoster, rosterToCsv)
 │  ├─ sessions.ts             # session sanitize/validate (title/speaker/transcript), appendSegment, countWords, pickRecordingMime, isSessionStatus
 │  ├─ use-session-recorder.ts # useSessionRecorder — live STT recorder (Web Speech | Scribe MediaRecorder segments) → onSegment
+│  ├─ summaries.ts            # recap helpers: isSummarizable, indexSummariesBySession, buildWhatsAppShareUrl (Phase 4)
 │  └─ index.ts                # barrel
 ├─ lib/
 │  └─ utils.ts                # shadcn `cn()` helper ONLY (ecosystem convention)
 ├─ server/                    # ⚠️ server-only (never imported by client / barrel)
 │  ├─ game-hub.ts             # in-memory SSE pub/sub hub: host state + event phase + subscribers + aggregated leaderboard + live presence headcount (refcounted per device)
+│  ├─ ai/
+│  │  └─ summary.ts           # generateSummary — Claude (Anthropic Messages API via fetch) recap keyed to goals; retries; throws on failure (Phase 4)
 │  └─ db/                     # Postgres persistence (Drizzle) — Nov event
-│     ├─ schema.ts            # attendees + game_scores + sessions (title/speaker/status/transcript, Phase 3)
+│     ├─ schema.ts            # attendees + game_scores + sessions + summaries (per session×attendee, FK-cascade, Phase 4)
 │     ├─ index.ts             # lazy getDb() (null when DATABASE_URL unset; Render TLS)
-│     ├─ attendees.ts         # upsertAttendee (by email; id-collision retry) + markCheckedIn (memoized) + listRoster (⋈ scores)
+│     ├─ attendees.ts         # upsertAttendee (by email; id-collision retry) + markCheckedIn (memoized) + getAttendeeById + listRoster (⋈ scores)
 │     ├─ scores.ts            # upsertBestScore (GREATEST keeps the event-best)
-│     └─ sessions.ts          # create/list/get/update/delete sessions + toSession DTO mapper
+│     ├─ sessions.ts          # create/list/get/update/delete sessions + toSession DTO mapper
+│     └─ summaries.ts         # getSummary (by session×attendee) / listByAttendee / upsert (regenerate) / updateContent (edit) + toSummary
 ├─ types/
-│  ├─ index.ts                # shared TS types (Attendee, ScheduleItem, GameSession, GameSessionState, ScoreEntry, RosterEntry, Session, …)
+│  ├─ index.ts                # shared TS types (Attendee, ScheduleItem, GameSession, GameSessionState, ScoreEntry, RosterEntry, Session, Summary, …)
 │  └─ speech-recognition.d.ts # ambient Web Speech API types (SpeechRecognition — not in TS DOM lib yet)
 └─ data/
    └─ event.ts                # mock demo data (attendee, schedule, leaderboard, state)
@@ -605,8 +612,49 @@ one host device records speakers, `wa.me` share links (no WhatsApp API).
 
 Build order: **Phase 1 — registration + Postgres (✅ done, see above)** ·
 **Phase 2 — roster/attendance + persistent scores (✅ done, below)** ·
-**Phase 3 — speaker sessions + STT (✅ done, below)** · Phase 4 — AI summaries
-(Claude) + WhatsApp share · Phase 5 — PWA + Web Push · Phase 6 — hardening/deploy.
+**Phase 3 — speaker sessions + STT (✅ done, below)** ·
+**Phase 4 — AI summaries (Claude) + WhatsApp share (✅ done, below)** ·
+Phase 5 — PWA + Web Push · Phase 6 — hardening/deploy.
+
+**Phase 4 — personalized AI session recaps + WhatsApp share (built).**
+
+- **Summaries.** `summaries` (Postgres): one per (session × attendee) — unique
+  constraint, FK to `sessions` with `ON DELETE CASCADE`; `content` + `edited`.
+  Store in `src/server/db/summaries.ts`. The recap is personalized to the
+  attendee's learning goals (server prefers the stored `attendees.goals`, falls
+  back to goals sent by the client).
+- **Generation (Claude).** `src/server/ai/summary.ts` calls the **Anthropic
+  Messages API via `fetch`** (no SDK dependency — same proxy pattern as
+  voice/transcribe). Model default `claude-sonnet-5` (override `ANTHROPIC_MODEL`;
+  bump to `claude-opus-4-8` for max quality). The prompt asks for a short
+  plain-text recap + "Key points" + "Your action items" tied to the goals,
+  grounded in the transcript. `ANTHROPIC_API_KEY` is server-only.
+- **Routes.** `POST /api/summaries` returns the **cached** summary if one exists
+  (no key needed) — otherwise generates, stores, returns (needs the key; 501
+  when unset; `regenerate: true` forces a fresh one). `GET /api/summaries?attendeeId=`
+  lists an attendee's recaps; `PATCH /api/summaries/[id]` saves an edit (sets
+  `edited`).
+- **Attendee UI.** `/recaps` (`src/components/navigator/recaps-screen.tsx` +
+  `summary-card.tsx`, reached from a home entry card `recaps-entry-card.tsx`):
+  a gradient header with the attendee's goal chips, then one card per recorded
+  talk — **Generate my recap** → read → **Edit**/save → **Share on WhatsApp**
+  (`wa.me/?text=` click-to-chat, `buildWhatsAppShareUrl`; no WhatsApp API,
+  per the Nov decision). Regenerate re-runs Claude.
+
+**IMPORTANT — `ANTHROPIC_API_KEY` is prod-only** (like `ELEVENLABS_API_KEY`):
+set it in Render's env, not local `.env.local`. So `/api/summaries` **generation**
+returns 501 locally and the recaps screen shows a friendly "not switched on yet"
+notice; the real Claude generation path is verified in production. **Cache hits,
+editing, listing, and WhatsApp share all work with no key** (no generation
+needed), so those are fully verified locally.
+
+Verified against a production build + real local Postgres: sessions/summaries
+CRUD + validations (POST 400 missing ids; generate → 501 with no key; cache-hit
+POST → 200 with no key; GET list; PATCH edit → `edited=true`; 404 on unknown id);
+attendee E2E in-browser (seeded onboarded identity) — the recaps screen rendered
+the goal chips + per-session cards, the graceful 501 toast fired on Generate, an
+edit saved and DB-persisted, the WhatsApp `wa.me` URL built correctly
+(title — speaker + recap), 430px no-overflow, no console errors.
 
 **Phase 3 — speaker sessions + live STT (built).**
 
