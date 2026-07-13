@@ -7,7 +7,9 @@ import {
 } from "@/server/game-hub";
 import { getDb } from "@/server/db";
 import { upsertBestScore } from "@/server/db/scores";
+import { sendPhasePush, sendReminderPush } from "@/server/push/send";
 import { RealtimeMessage } from "@/constants/realtime";
+import type { EventPhase } from "@/constants/phases";
 import type { ScoreEntry } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -27,10 +29,14 @@ export async function POST(request: Request) {
     publishState(body.state);
   } else if (body.type === RealtimeMessage.Reminder && typeof body.reminderId === "string") {
     publishReminder(body.reminderId);
+    // Also push it to phones (even backgrounded/closed) — fire-and-forget.
+    void sendReminderPush(body.reminderId).catch(() => {});
   } else if (body.type === RealtimeMessage.Score && body.entry) {
     if (submitScore(body.entry)) persistScore(body.entry);
   } else if (body.type === RealtimeMessage.Phase && typeof body.phase === "string") {
     publishPhase(body.phase);
+    // "What's next" phone notification for every attendee — fire-and-forget.
+    void sendPhasePush(body.phase as EventPhase).catch(() => {});
   } else if (body.type === RealtimeMessage.Countdown && typeof body.seconds === "number") {
     publishCountdown(body.seconds);
   } else {

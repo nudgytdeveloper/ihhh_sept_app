@@ -19,6 +19,7 @@ import { AvatarMood } from "@/constants/statuses";
 import { HOST_REMINDERS, CELEBRATION } from "@/constants/host";
 import { useGameChannel } from "@/utils/use-game-channel";
 import { usePlayerIdentity } from "@/utils/player-identity";
+import { registerServiceWorker } from "@/utils/push";
 import { speakLine } from "@/utils/navi-voice";
 import { formatNaviWinner } from "@/utils/navi";
 import { useCountdown } from "@/utils/use-countdown";
@@ -100,6 +101,11 @@ export function AttendeeShell({ children }: { children: React.ReactNode }) {
     onboardedRef.current = identity.onboarded;
   });
   useEffect(() => () => window.clearTimeout(celebrateTimer.current), []);
+  // Register the push/PWA service worker once — makes the app installable and
+  // readies it to receive phone notifications (no-op on unsupported browsers).
+  useEffect(() => {
+    void registerServiceWorker();
+  }, []);
 
   const { value: countdownValue, start: startCountdown } = useCountdown();
 

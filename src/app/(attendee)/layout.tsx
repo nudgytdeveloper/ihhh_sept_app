@@ -1,6 +1,7 @@
 import { Compass } from "lucide-react";
 import { APP_NAME, EVENT_NAME, EVENT_VENUE } from "@/constants/app";
 import { NaviVoiceToggle } from "@/components/navigator/navi-voice-toggle";
+import { NotificationToggle } from "@/components/navigator/notification-toggle";
 import { AttendeeShell } from "@/components/navigator/attendee-shell";
 
 /**
@@ -29,6 +30,7 @@ export default function AttendeeLayout({
             <p className="hidden text-right text-xs text-muted-foreground sm:block">
               {EVENT_VENUE}
             </p>
+            <NotificationToggle />
             <NaviVoiceToggle />
           </div>
         </div>

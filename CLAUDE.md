@@ -153,6 +153,7 @@ src/
 ├─ app/
 │  ├─ layout.tsx              # root: fonts, metadata, TooltipProvider, Toaster
 │  ├─ globals.css             # design tokens + brand utilities
+│  ├─ manifest.ts             # PWA manifest → /manifest.webmanifest (installable; icons in public/, Phase 5)
 │  ├─ (attendee)/             # attendee shell (ambient bg, header, AttendeeShell: onboarding gate + live phase/reminders/leaderboard/headcount)
 │  │  ├─ layout.tsx
 │  │  ├─ page.tsx             # Screen 1 (/) — thin; renders navigator-home (live phase + onboarded persona)
@@ -175,9 +176,11 @@ src/
 │     ├─ sessions/route.ts    # speaker sessions: GET list / POST create; [id]/route.ts GET/PATCH/DELETE (Phase 3)
 │     ├─ transcribe/route.ts  # STT: POST audio → ElevenLabs Scribe (reuses ELEVENLABS_API_KEY) → {text}; 501 when unset; GET {configured}
 │     ├─ summaries/route.ts   # AI recaps: POST generate/cache (Gemini, per attendee goals; cache-hit needs no key) + GET list; [id] PATCH edit (Phase 4)
+│     ├─ push/                # Web Push (Phase 5): route.ts GET {configured, publicKey}; subscribe/ + unsubscribe/ POST
 │     └─ voice/route.ts       # Navi cloud TTS: POST a line → ElevenLabs (server-only key) → MP3; cached, 501 when unconfigured
 ├─ components/
 │  ├─ ui/                     # shadcn/ui primitives
+│  ├─ navigator/              # attendee screens (incl. notifications-card + notification-toggle — Web Push opt-in, Phase 5)
 │  └─ scaffold/               # dev placeholders (ScreenStub)
 ├─ constants/                 # ⚠️ all enums & literals live here (see rules)
 │  ├─ app.ts                  # app/event identity + AVATAR_NAME
@@ -194,6 +197,7 @@ src/
 │  ├─ roster.ts               # ROSTER_API_PATH, ROSTER_REFRESH_MS, CSV filename/headers (host roster)
 │  ├─ sessions.ts             # SessionStatus, SESSION_STATUS_META, RECORDING_CONFIG, SCRIBE_CONFIG, SttProvider/STT_PROVIDER, RecorderState, API paths
 │  ├─ summaries.ts            # SUMMARY_CONFIG (Gemini model/endpoint), SUMMARY_LIMITS, WHATSAPP_SHARE, API paths (Phase 4)
+│  ├─ push.ts                 # PushStatus, VAPID_ENV, PUSH_* API paths, SW path/scope, notification copy/tags (Phase 5)
 │  └─ index.ts                # barrel
 ├─ utils/                     # ⚠️ all reusable functions live here (see rules)
 │  ├─ format.ts               # formatCountdown, formatScore, getInitials, template
@@ -210,6 +214,7 @@ src/
 │  ├─ sessions.ts             # session sanitize/validate (title/speaker/transcript), appendSegment, countWords, pickRecordingMime, isSessionStatus
 │  ├─ use-session-recorder.ts # useSessionRecorder — live STT recorder (Web Speech | Scribe MediaRecorder segments) → onSegment
 │  ├─ summaries.ts            # recap helpers: isSummarizable, indexSummariesBySession, buildWhatsAppShareUrl (Phase 4)
+│  ├─ push.ts                 # "use client" push store + usePushSubscription (register SW, permission→subscribe→persist) (Phase 5)
 │  └─ index.ts                # barrel
 ├─ lib/
 │  └─ utils.ts                # shadcn `cn()` helper ONLY (ecosystem convention)
@@ -217,13 +222,16 @@ src/
 │  ├─ game-hub.ts             # in-memory SSE pub/sub hub: host state + event phase + subscribers + aggregated leaderboard + live presence headcount (refcounted per device)
 │  ├─ ai/
 │  │  └─ summary.ts           # generateSummary — Gemini (Google Generative Language API via fetch) recap keyed to goals; retries; throws on failure (Phase 4)
+│  ├─ push/
+│  │  └─ send.ts              # web-push sender (VAPID + aes128gcm): sendPushToAll/sendPhasePush/sendReminderPush; prunes 404/410 subs (Phase 5)
 │  └─ db/                     # Postgres persistence (Drizzle) — Nov event
-│     ├─ schema.ts            # attendees + game_scores + sessions + summaries (per session×attendee, FK-cascade, Phase 4)
+│     ├─ schema.ts            # attendees + game_scores + sessions + summaries + push_subscriptions (Phase 5)
 │     ├─ index.ts             # lazy getDb() (null when DATABASE_URL unset; Render TLS)
 │     ├─ attendees.ts         # upsertAttendee (by email; id-collision retry) + markCheckedIn (memoized) + getAttendeeById + listRoster (⋈ scores)
 │     ├─ scores.ts            # upsertBestScore (GREATEST keeps the event-best)
 │     ├─ sessions.ts          # create/list/get/update/delete sessions + toSession DTO mapper
-│     └─ summaries.ts         # getSummary (by session×attendee) / listByAttendee / upsert (regenerate) / updateContent (edit) + toSummary
+│     ├─ summaries.ts         # getSummary (by session×attendee) / listByAttendee / upsert (regenerate) / updateContent (edit) + toSummary
+│     └─ push-subscriptions.ts # upsert/list/list-by-attendee/delete push subscriptions (keyed by endpoint, Phase 5)
 ├─ types/
 │  ├─ index.ts                # shared TS types (Attendee, ScheduleItem, GameSession, GameSessionState, ScoreEntry, RosterEntry, Session, Summary, …)
 │  └─ speech-recognition.d.ts # ambient Web Speech API types (SpeechRecognition — not in TS DOM lib yet)
@@ -614,7 +622,68 @@ Build order: **Phase 1 — registration + Postgres (✅ done, see above)** ·
 **Phase 2 — roster/attendance + persistent scores (✅ done, below)** ·
 **Phase 3 — speaker sessions + STT (✅ done, below)** ·
 **Phase 4 — AI summaries (Gemini) + WhatsApp share (✅ done, below)** ·
-Phase 5 — PWA + Web Push · Phase 6 — hardening/deploy.
+**Phase 5 — PWA + Web Push notifications (✅ done, below)** ·
+Phase 6 — hardening/deploy.
+
+**Phase 5 — PWA install + Web Push notifications (built).** This is the "phone
+notifications for next event timelines" requirement: attendees opt in, and the
+host's **reminders** and **event-journey phase changes** then arrive as a real
+phone notification **even when the app is backgrounded/closed** — no third-party
+push service, it runs on the same single Render web service as the SSE hub.
+
+- **Transport.** Browser **Push API** + a **VAPID** keypair (server-only private
+  key). Delivery is `web-push` (`src/server/push/send.ts`) — the one place we use
+  a library instead of a hand-rolled `fetch`, because Web Push is a crypto
+  protocol (aes128gcm payload encryption + a VAPID ES256 JWT). `sendPushToAll` /
+  `sendPhasePush` / `sendReminderPush` fan a payload out to every stored
+  subscription and **prune** a subscription when its push service replies 404/410.
+- **Persistence.** `push_subscriptions` (Postgres): keyed by push `endpoint`,
+  stores `p256dh` + `auth` + `attendeeId`. Store in
+  `src/server/db/push-subscriptions.ts` (upsert on endpoint). Requires
+  `DATABASE_URL` (nothing to deliver to without a stored subscription).
+- **Routes.** `GET /api/push` → `{configured, publicKey}` (client reads the VAPID
+  public key here — the private key never leaves the server); `POST
+  /api/push/subscribe` stores the subscription + fires a confirmation push; `POST
+  /api/push/unsubscribe` drops it. The host's existing `/api/game/publish`
+  additionally calls `sendReminderPush` / `sendPhasePush` **fire-and-forget** (the
+  SSE fan-out never waits on push), so the same host action drives both the live
+  in-app toast (SSE) and the phone notification (push).
+- **Service worker.** `public/sw.js` — deliberately minimal: `push` (show
+  notification) + `notificationclick` (focus/open, deep-links a phase push to
+  `/schedule`). **No `fetch` handler**, so it never intercepts Next navigation or
+  caches — installing it can't break the app.
+- **PWA install.** `src/app/manifest.ts` → `/manifest.webmanifest` (standalone,
+  theme color, 4 icons incl. maskable); branded Navi icons + monochrome badge in
+  `public/` (`icon-192/512{,-maskable}.png`, `apple-touch-icon.png`,
+  `badge-72.png`); root layout adds `appleWebApp` + apple-touch icon. Installing
+  to the home screen is also the prerequisite for Web Push on **iOS 16.4+**.
+- **Client + UI.** `src/utils/push.ts` — a module-level store (like `navi-voice`)
+  behind `usePushSubscription()`; registers the SW (in `AttendeeShell` on mount),
+  runs the permission → subscribe → persist flow, and exposes a `PushStatus`
+  (`Unknown`/`Unsupported`/`Unconfigured`/`Blocked`/`Off`/`On`). The attendee
+  opts in via the home **`NotificationsCard`** (Navi-styled) or the header bell
+  **`NotificationToggle`** (both share the one store). Both hide themselves when
+  push is unsupported on the device or not switched on server-side, so nothing is
+  advertised that can't deliver. Copy/config in `src/constants/push.ts`.
+- **Env.** Server-only `VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY` + `VAPID_SUBJECT`
+  (generate with `npx web-push generate-vapid-keys`; set the **same three** on
+  Render **and** local `.env.local` — unlike the ElevenLabs/Gemini keys, push is
+  fully testable locally over Chrome). No keys ⇒ `/api/push` reports
+  `{configured:false}`, the opt-in UI stays hidden, and nothing else changes.
+  **Deploy note:** run `db:push` to add `push_subscriptions` to Render (same
+  external-URL + `?sslmode=require` flow as prior tables), and set the three VAPID
+  env vars, before the feature works in production.
+
+Verified against a production build (`next start`) + real local Postgres: **33/33
+checks** — the `web-push` crypto pipeline (valid VAPID token + aes128gcm), the
+routes end-to-end with a **real encrypted push delivered over TLS to a local mock
+push service** (welcome push on subscribe + "what's next" push on a phase
+publish, both aes128gcm with a VAPID Authorization), subscribe/unsubscribe DB
+round-trips, 400 on a bad body, and the manifest + all icons + `sw.js` serving
+(SW has push + notificationclick, no fetch handler). In-browser (Chrome, seeded
+onboarded identity): the SW registered + controlled, the `NotificationsCard` +
+header bell rendered with no permission prompt, **no 430px overflow**
+(`scrollWidth === innerWidth` measured in a 430px iframe), and no console errors.
 
 **Phase 4 — personalized AI session recaps + WhatsApp share (built).**
 
@@ -733,15 +802,20 @@ SSE connection was open and false after close, roster ordering + search filter
 + 430px no-overflow (measured `scrollWidth === innerWidth` in-browser; only
 the table scrolls, inside its own container).
 
-## Status — June demo complete 🎉
+## Status — June demo complete 🎉 · Nov MVP features complete
 
 All **5 demo screens are built** (see the scope table above), plus **cross-device
 realtime** host→attendee sync (SSE, Render-ready), a **shared live leaderboard**
 (server-aggregated), a **live attendee headcount** (server-tracked presence), Navi
 voice, **attendee onboarding** (name + auto seat), and a **host-driven live event
-journey** (above). `ScreenStub`
-(`src/components/scaffold`) is unused — keep it for any future scaffolding.
-Remaining ideas (not yet requested): multi-instance scaling (swap the in-memory
-hub for Redis pub/sub behind the same `GameChannel` seam), persisting hub state
-(phase + board) across server restarts, and the remaining (post-demo) modules
-beyond these 5.
+journey** (above).
+
+**All four Nov 2026 MVP features are now built** (registration, roster/attendance,
+speaker sessions + STT, AI recaps, **and phone notifications / PWA — Phase 5**).
+Of the 6-phase Nov build order, only **Phase 6 (hardening/deploy)** remains — not
+yet requested. `ScreenStub` (`src/components/scaffold`) is unused — keep it for any
+future scaffolding. Remaining ideas (not yet requested): multi-instance scaling
+(swap the in-memory hub for Redis pub/sub behind the same `GameChannel` seam — and
+the same swap would move `push_subscriptions` fan-out off the single instance),
+persisting hub state (phase + board) across server restarts, and the remaining
+(post-demo) modules beyond these 5.

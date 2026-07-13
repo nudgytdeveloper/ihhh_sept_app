@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Sora, Geist_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
-import { APP_NAME, APP_TAGLINE } from "@/constants/app";
+import { APP_NAME, APP_SHORT_NAME, APP_TAGLINE } from "@/constants/app";
 import "./globals.css";
 
 const fontSans = Plus_Jakarta_Sans({
@@ -29,6 +29,17 @@ export const metadata: Metadata = {
     template: `%s · ${APP_NAME}`,
   },
   description: APP_TAGLINE,
+  // PWA: `manifest.ts` auto-links the web manifest; these add the iOS home-screen
+  // icon + standalone launch (the prerequisite for Web Push on iOS 16.4+).
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: APP_SHORT_NAME,
+  },
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {

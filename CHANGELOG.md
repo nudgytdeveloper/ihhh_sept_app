@@ -3,6 +3,10 @@
 ## 2026-07-13
 
 ### Added
+- Web Push phone notifications (Nov Phase 5): attendees opt into alerts; host reminders and event-journey phase changes fan out a real notification (aes128gcm + VAPID via `web-push`) even with the app closed — fired fire-and-forget from `/api/game/publish`
+- `push_subscriptions` table + store, `/api/push` (GET config), `/api/push/subscribe`, `/api/push/unsubscribe`; sender `src/server/push/send.ts` (prunes 404/410 subscriptions); `src/utils/push.ts` client store + `usePushSubscription` hook
+- PWA install: `src/app/manifest.ts` (`/manifest.webmanifest`), branded Navi icons (192/512 + maskable + apple-touch + monochrome badge) in `public/`, iOS `appleWebApp` metadata, and a minimal push service worker `public/sw.js` (no fetch handler)
+- Attendee opt-in UI: home `NotificationsCard` (Navi-styled) + header bell `NotificationToggle` (shares one push store); `src/constants/push.ts`, `PushSubscriptionInput`/`NotificationPayload`/`PushConfigResponse` types
 - Personalized AI session recaps + WhatsApp share (Nov Phase 4): `summaries` table (per session × attendee, FK-cascade), `/api/summaries` (POST generate/cache — Google Gemini, keyed to the attendee's learning goals; cache-hit needs no key; 501 when unset) + GET list + `[id]` PATCH edit
 - Attendee "Session recaps" screen at `/recaps` (+ home entry card): generate a recap per recorded talk, edit it, share to WhatsApp via `wa.me`; server summarizer `src/server/ai/summary.ts`
 - Summaries constants/helpers (`src/constants/summaries.ts`, `src/utils/summaries.ts`: `buildWhatsAppShareUrl`, `isSummarizable`), `Summary`/`SummaryResponse`/`SummaryListResponse` types, `ROUTES.RECAPS`, `getAttendeeById`

@@ -98,3 +98,21 @@ export const summaries = pgTable(
 );
 
 export type SummaryRow = typeof summaries.$inferSelect;
+
+/**
+ * A Web Push subscription for one attendee device (Nov-event Phase 5). Keyed by
+ * the push service `endpoint` (unique per device+browser); `p256dh` + `auth` are
+ * the client keys the server encrypts payloads to. One attendee can hold several
+ * (multiple devices/browsers). Stale rows are pruned when the push service
+ * replies 404/410 (see `src/server/push/send.ts`).
+ */
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  endpoint: text("endpoint").primaryKey(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  /** The attendee (device/player id = attendees.id) this subscription belongs to. */
+  attendeeId: text("attendee_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;

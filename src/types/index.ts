@@ -199,3 +199,31 @@ export interface Reminder {
   /** Soft accent class bundle for the icon tile (Tailwind literal). */
   accent: string;
 }
+
+/**
+ * A Web Push subscription as the client posts it to `/api/push/subscribe`
+ * (Phase 5) — the browser `PushSubscription` split into what the server stores,
+ * plus which attendee it belongs to.
+ */
+export interface PushSubscriptionInput {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  attendeeId: string;
+}
+
+/** What one push notification carries (serialized to the service worker). */
+export interface NotificationPayload {
+  title: string;
+  body: string;
+  /** Deep-link opened when the notification is tapped. */
+  url?: string;
+  /** Notifications sharing a tag replace each other instead of stacking. */
+  tag?: string;
+  icon?: string;
+}
+
+/** `GET /api/push` — whether push is switched on server-side + the VAPID public key. */
+export interface PushConfigResponse {
+  configured: boolean;
+  publicKey: string | null;
+}
