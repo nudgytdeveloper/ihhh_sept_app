@@ -5,6 +5,7 @@ import { TappableNavi } from "@/components/navigator/tappable-navi";
 import { usePlayerCount, useWinnerName } from "@/components/navigator/attendee-shell";
 import { AVATAR_NAME } from "@/constants/app";
 import { NaviReaction, NAVI_CONFIG, NAVI_TAP_HINT } from "@/constants/navi";
+import { TourAnchor } from "@/constants/tutorial";
 import type { AvatarScript } from "@/constants/avatar-scripts";
 import { template } from "@/utils/format";
 import { getNaviArrivalLine, formatNaviPresence, formatNaviWinner } from "@/utils/navi";
@@ -89,7 +90,7 @@ export function NaviHost({ script, name }: { script: AvatarScript; name: string 
   const line = pop ?? message;
 
   return (
-    <div className="flex w-full flex-col items-center text-center">
+    <div data-tour={TourAnchor.Navi} className="flex w-full flex-col items-center text-center">
       <TappableNavi
         gestures={gestures}
         name={name}

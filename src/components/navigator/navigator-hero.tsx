@@ -7,6 +7,7 @@ import { NaviTips } from "@/components/navigator/navi-tips";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ActionIntent } from "@/constants/statuses";
+import { TourAnchor } from "@/constants/tutorial";
 import type { AvatarScript } from "@/constants/avatar-scripts";
 
 /**
@@ -30,7 +31,10 @@ export function NavigatorHero({
 
       {/* Next action(s) */}
       {primary || secondary ? (
-        <div className="mt-5 flex w-full flex-col gap-2.5 sm:flex-row sm:justify-center">
+        <div
+          data-tour={TourAnchor.NextAction}
+          className="mt-5 flex w-full flex-col gap-2.5 sm:flex-row sm:justify-center"
+        >
           {primary ? (
             <Button
               asChild

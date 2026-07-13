@@ -865,6 +865,43 @@ SSE connection was open and false after close, roster ordering + search filter
 + 430px no-overflow (measured `scrollWidth === innerWidth` in-browser; only
 the table scrolls, inside its own container).
 
+## First-time onboarding tutorial — wired
+
+Both apps have a **first-run walkthrough** — a Navi-led coach-mark tour that
+dims the screen, spotlights each key spot, and floats a Navi callout beside it
+(Back / Next / Skip + progress dots). It **auto-runs once per device**, then
+stores a version-stamped flag in localStorage (`ihhh:tutorial:<tour>`) so it
+never nags again; a quiet **"Replay tour"** button re-triggers it on demand.
+
+- `src/constants/tutorial.ts` — `TutorialTour` (Attendee/Host), `TourAnchor`
+  (the `data-tour="<id>"` targets), per-tour step copy (`ATTENDEE_TOUR_STEPS`
+  6 steps / `HOST_TOUR_STEPS` 5 steps), `TUTORIAL_VERSION` (bump to re-show),
+  `TUTORIAL_COPY`.
+- `src/utils/tutorial.ts` — `"use client"` module store (mirrors `navi-voice` /
+  `host-auth`): `useTutorial()` + `hasCompletedTour`/`markTourComplete`/`startTour`/
+  `stopTour`/`resetTour`, plus the pure `computeCalloutLayout()` placement math
+  (picks a side, clamps the callout fully on-screen, aims the pointer).
+- `src/components/tutorial/guided-tour.tsx` — the engine (portal above the header;
+  spotlight = one big `box-shadow`; measures the target, **synchronously** on
+  step change so it never depends on `requestAnimationFrame`, which browsers pause
+  on idle/hidden tabs; rAF-coalesced scroll/resize re-measure; missing anchors —
+  e.g. the notifications card when push is off — are dropped so the counter stays
+  honest; Esc/arrow-key nav; reduced-motion-guarded). `tutorial-replay-button.tsx`
+  — the ghost "Replay tour" trigger.
+- Targets: `Reveal` gained a `data-tour` anchor passthrough; anchors sit on Navi
+  (`navi-host`), the hero CTA (`navigator-hero`), the home cards (`navigator-home`),
+  and the host panel's journey / flow / boss / reminders / leaderboard blocks.
+  `GuidedTour` mounts inside `navigator-home` (attendee) and `host-control-panel`
+  (host), so each only runs on its own screen (after onboarding / passcode).
+
+Verified against a production build in headless Chrome (mobile width): attendee
+auto-run walks all 6 steps → "Got it" persists `ihhh:tutorial:attendee`; reload
+doesn't re-run; **Replay tour** re-opens it; the host tour auto-runs on `/host`
+and walks all 5 steps → persists `ihhh:tutorial:host`; no 430px overflow, no
+console errors. (A first pass hit an infinite-render loop from a ResizeObserver +
+smooth-scroll feedback path and an rAF-throttle stall — both fixed by the
+synchronous-measure + rAF-coalesced design above.)
+
 ## Status — June demo complete 🎉 · Nov MVP complete · all 6 phases done ✅
 
 All **5 demo screens are built** (see the scope table above), plus **cross-device

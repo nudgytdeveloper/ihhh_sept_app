@@ -8,6 +8,9 @@ import { RecapsEntryCard } from "@/components/navigator/recaps-entry-card";
 import { NotificationsCard } from "@/components/navigator/notifications-card";
 import { StatusCard } from "@/components/navigator/status-card";
 import { RemindersCard } from "@/components/navigator/reminders-card";
+import { GuidedTour } from "@/components/tutorial/guided-tour";
+import { TutorialReplayButton } from "@/components/tutorial/tutorial-replay-button";
+import { ATTENDEE_TOUR_STEPS, TourAnchor, TutorialTour } from "@/constants/tutorial";
 import {
   useEventPhase,
   useGameStatus,
@@ -53,23 +56,26 @@ export function NavigatorHome() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 px-4 pb-12 pt-6">
+      {/* First-time onboarding tour (auto-runs once; persisted in localStorage) */}
+      <GuidedTour tour={TutorialTour.Attendee} steps={ATTENDEE_TOUR_STEPS} />
+
       <Reveal delay={0}>
         <NavigatorHero script={script} name={firstName} />
       </Reveal>
 
-      <Reveal delay={90}>
+      <Reveal delay={90} anchor={TourAnchor.Journey}>
         <PhaseProgress phase={phase} />
       </Reveal>
 
-      <Reveal delay={180}>
+      <Reveal delay={180} anchor={TourAnchor.Game}>
         <GamePreviewCard game={game} leaderboard={leaderboard} playerCount={onlineCount} />
       </Reveal>
 
-      <Reveal delay={270}>
+      <Reveal delay={270} anchor={TourAnchor.Recaps}>
         <RecapsEntryCard />
       </Reveal>
 
-      <Reveal delay={360}>
+      <Reveal delay={360} anchor={TourAnchor.Notifications}>
         <NotificationsCard />
       </Reveal>
 
@@ -79,6 +85,10 @@ export function NavigatorHome() {
 
       <Reveal delay={540}>
         <RemindersCard reminders={MOCK_REMINDERS} />
+      </Reveal>
+
+      <Reveal delay={630} className="flex justify-center pt-1">
+        <TutorialReplayButton tour={TutorialTour.Attendee} />
       </Reveal>
     </div>
   );

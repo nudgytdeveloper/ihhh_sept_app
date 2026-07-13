@@ -19,6 +19,9 @@ import { HostLeaderboard } from "@/components/host/host-leaderboard";
 import { HostActivityLog, type LogEntry } from "@/components/host/host-activity-log";
 import { ConfettiBurst } from "@/components/effects/confetti";
 import { CountdownOverlay } from "@/components/effects/countdown-overlay";
+import { GuidedTour } from "@/components/tutorial/guided-tour";
+import { TutorialReplayButton } from "@/components/tutorial/tutorial-replay-button";
+import { HOST_TOUR_STEPS, TourAnchor, TutorialTour } from "@/constants/tutorial";
 import {
   GameStatus,
   BossShape,
@@ -222,19 +225,26 @@ export function HostControlPanel() {
       ) : null}
       <CountdownOverlay value={countdownValue} />
 
-      <EventJourneyControl phase={phase} onSelectPhase={handleSelectPhase} />
+      {/* First-time host walkthrough (auto-runs once; persisted in localStorage) */}
+      <GuidedTour tour={TutorialTour.Host} steps={HOST_TOUR_STEPS} />
 
-      <HostStatusBanner
-        status={status}
-        controls={controls}
-        playerCount={playerCount}
-        waves={waves}
-        activeBossShape={activeBossShape}
-        onStart={handleStart}
-        onLaunchCountdown={handleLaunchCountdown}
-        onEnd={handleEnd}
-        onReset={handleReset}
-      />
+      <div data-tour={TourAnchor.HostJourney}>
+        <EventJourneyControl phase={phase} onSelectPhase={handleSelectPhase} />
+      </div>
+
+      <div data-tour={TourAnchor.HostFlow}>
+        <HostStatusBanner
+          status={status}
+          controls={controls}
+          playerCount={playerCount}
+          waves={waves}
+          activeBossShape={activeBossShape}
+          onStart={handleStart}
+          onLaunchCountdown={handleLaunchCountdown}
+          onEnd={handleEnd}
+          onReset={handleReset}
+        />
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
@@ -266,18 +276,20 @@ export function HostControlPanel() {
               </CardFooter>
             </Card>
 
-            <BossControl
-              controls={controls}
-              selectedShape={selectedShape}
-              activeBossShape={activeBossShape}
-              onSelectShape={setSelectedShape}
-              onSpawnBoss={handleSpawnBoss}
-              onResume={handleResume}
-            />
+            <div data-tour={TourAnchor.HostBoss} className="h-full [&>*]:h-full">
+              <BossControl
+                controls={controls}
+                selectedShape={selectedShape}
+                activeBossShape={activeBossShape}
+                onSelectShape={setSelectedShape}
+                onSpawnBoss={handleSpawnBoss}
+                onResume={handleResume}
+              />
+            </div>
           </div>
 
           {/* Reminders */}
-          <Card>
+          <Card data-tour={TourAnchor.HostReminders}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Bell className="size-4 text-brand-purple" />
@@ -311,17 +323,23 @@ export function HostControlPanel() {
 
         {/* Leaderboard + activity rail */}
         <div className="flex flex-col gap-4">
-          <HostLeaderboard
-            leaderboard={leaderboard}
-            locked={locked}
-            controls={controls}
-            winner={winner}
-            playerCount={leaderboard.length}
-            onLock={handleLock}
-            onAnnounce={handleAnnounce}
-          />
+          <div data-tour={TourAnchor.HostLeaderboard}>
+            <HostLeaderboard
+              leaderboard={leaderboard}
+              locked={locked}
+              controls={controls}
+              winner={winner}
+              playerCount={leaderboard.length}
+              onLock={handleLock}
+              onAnnounce={handleAnnounce}
+            />
+          </div>
           <HostActivityLog log={log} />
         </div>
+      </div>
+
+      <div className="flex justify-center pt-1">
+        <TutorialReplayButton tour={TutorialTour.Host} />
       </div>
     </div>
   );
