@@ -1,7 +1,9 @@
 import { getDb } from "@/server/db";
 import { upsertPushSubscription } from "@/server/db/push-subscriptions";
 import { sendPushToAttendee } from "@/server/push/send";
+import { checkRateLimit, getClientId, rateLimitResponse } from "@/server/rate-limit";
 import { PUSH_NOTIFICATION, PUSH_WELCOME, PushTag } from "@/constants/push";
+import { RateLimitBucket } from "@/constants/rate-limit";
 import type { PushSubscriptionInput } from "@/types";
 
 export const runtime = "nodejs";
@@ -35,6 +37,9 @@ function parseSubscription(body: unknown): PushSubscriptionInput | null {
  * the database (there's nothing to deliver to without a stored subscription).
  */
 export async function POST(request: Request) {
+  const limit = checkRateLimit(RateLimitBucket.PushSubscribe, getClientId(request));
+  if (!limit.ok) return rateLimitResponse(limit);
+
   const sub = parseSubscription(await request.json().catch(() => null));
   if (!sub) {
     return Response.json({ ok: false, error: "invalid subscription" }, { status: 400 });

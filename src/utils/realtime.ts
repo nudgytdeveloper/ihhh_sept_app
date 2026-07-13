@@ -6,6 +6,8 @@ import {
   RealtimeMessage,
   RealtimeTransport,
 } from "@/constants/realtime";
+import { HOST_TOKEN_HEADER } from "@/constants/host-auth";
+import { getStoredHostToken } from "@/utils/host-auth";
 import type { EventPhase } from "@/constants/phases";
 import type { GameSessionState, ScoreEntry } from "@/types";
 
@@ -122,9 +124,14 @@ class SseTransport implements Transport {
     this.handlers.forEach((handler) => handler(message));
   }
   private post(body: object): void {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    // Attach the host passcode if this device has one (host-only actions need it;
+    // attendees have none, so their score posts go through unauthenticated).
+    const hostToken = getStoredHostToken();
+    if (hostToken) headers[HOST_TOKEN_HEADER] = hostToken;
     void fetch(REALTIME_PUBLISH_PATH, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(body),
       keepalive: true,
     }).catch(() => {});

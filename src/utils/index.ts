@@ -23,3 +23,4 @@ export * from "./sessions";
 export * from "./use-session-recorder";
 export * from "./summaries";
 export * from "./push";
+export * from "./host-auth";

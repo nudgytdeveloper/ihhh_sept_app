@@ -2,6 +2,7 @@ import { SlidersHorizontal } from "lucide-react";
 import { APP_NAME, EVENT_NAME } from "@/constants/app";
 import { GAME_NAME } from "@/constants/game";
 import { HostNav } from "@/components/host/host-nav";
+import { HostGate } from "@/components/host/host-gate";
 
 /**
  * Host-facing shell (control-room feel) — distinct from the attendee shell.
@@ -32,7 +33,7 @@ export default function HostLayout({
       </header>
 
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col">
-        {children}
+        <HostGate>{children}</HostGate>
       </main>
     </div>
   );

@@ -1,0 +1,46 @@
+# Render Blueprint (Nov-event Phase 6) — infra-as-code for the IHHH Event Navigator.
+#
+# Documents the deploy config of the existing `ihhh_sept_app` web service so it
+# lives in the repo, not just the dashboard. Secrets (sync: false) are still set
+# in the Render dashboard, never committed. The Postgres database (ihhh-db) is
+# managed separately; DATABASE_URL points at its Internal URL.
+#
+# Build uses pnpm (frozen lockfile) — after any npm dependency change, run
+# `pnpm install --lockfile-only` and commit pnpm-lock.yaml.
+services:
+  - type: web
+    name: ihhh_sept_app
+    runtime: node
+    region: singapore
+    plan: starter
+    branch: main
+    buildCommand: pnpm install && pnpm run build
+    startCommand: pnpm run start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # --- Persistence (Internal URL of the ihhh-db Postgres instance) ---
+      - key: DATABASE_URL
+        sync: false
+      # --- Host control-room passcode (locks /host + host publish actions) ---
+      - key: HOST_TOKEN
+        sync: false
+      # --- Web Push (VAPID) — phone notifications ---
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+      # --- AI session recaps (Google Gemini) ---
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      # --- ElevenLabs (Navi voice + Scribe STT) ---
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: NEXT_PUBLIC_VOICE_PROVIDER
+        value: elevenlabs

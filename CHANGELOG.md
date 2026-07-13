@@ -3,6 +3,11 @@
 ## 2026-07-13
 
 ### Added
+- Host control-room passcode (Nov Phase 6): server-only `HOST_TOKEN` gates `/host` (a Navi-styled passcode gate) and host-only publish actions — `/api/game/publish` now 401s host phase/reminder/state/countdown without a valid `x-host-token`, so attendees can't hijack the event or fan a push to every phone (scores stay open). Open when `HOST_TOKEN` is unset; `/api/host/verify` GET/POST + `src/utils/host-auth.ts` store
+- Rate limiting (Nov Phase 6): in-memory per-IP fixed-window limits on the paid/abusable routes — summaries (Gemini), transcribe (ElevenLabs), register, push-subscribe, host-verify — returning 429 + Retry-After (`src/server/rate-limit.ts`, `src/constants/rate-limit.ts`); the shared-NAT score path is deliberately unthrottled
+- Security headers (Nov Phase 6): CSP, HSTS (prod), X-Frame-Options DENY, X-Content-Type-Options, Referrer-Policy, Permissions-Policy on every route via `next.config.ts`
+- Error boundaries + health (Nov Phase 6): Navi-styled `error.tsx` / `global-error.tsx` / `not-found.tsx`, a `/api/health` endpoint (DB reachability, always 200), and a startup env summary via `instrumentation.ts` (`src/server/env.ts`)
+- `render.yaml` (Nov Phase 6): infra-as-code for the web service (build/start, `healthCheckPath: /api/health`, declared env vars)
 - Web Push phone notifications (Nov Phase 5): attendees opt into alerts; host reminders and event-journey phase changes fan out a real notification (aes128gcm + VAPID via `web-push`) even with the app closed — fired fire-and-forget from `/api/game/publish`
 - `push_subscriptions` table + store, `/api/push` (GET config), `/api/push/subscribe`, `/api/push/unsubscribe`; sender `src/server/push/send.ts` (prunes 404/410 subscriptions); `src/utils/push.ts` client store + `usePushSubscription` hook
 - PWA install: `src/app/manifest.ts` (`/manifest.webmanifest`), branded Navi icons (192/512 + maskable + apple-touch + monochrome badge) in `public/`, iOS `appleWebApp` metadata, and a minimal push service worker `public/sw.js` (no fetch handler)

@@ -8,8 +8,10 @@ import {
   upsertSummary,
 } from "@/server/db/summaries";
 import { generateSummary } from "@/server/ai/summary";
+import { checkRateLimit, getClientId, rateLimitResponse } from "@/server/rate-limit";
 import { sanitizeLearningGoals } from "@/utils/registration";
 import { EMPTY_LEARNING_GOALS } from "@/constants/registration";
+import { RateLimitBucket } from "@/constants/rate-limit";
 import type { LearningGoals, SummaryListResponse } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -39,9 +41,10 @@ export async function GET(request: Request) {
 
 /**
  * POST — the attendee's personalized recap for a session. Returns the cached
- * summary if one exists (no API key needed); otherwise generates it with Claude
+ * summary if one exists (no API key needed); otherwise generates it with Gemini
  * (tailored to the attendee's learning goals), stores, and returns it. Pass
- * `regenerate: true` to force a fresh generation.
+ * `regenerate: true` to force a fresh generation. Generation is rate-limited
+ * (cache hits are not), since each fresh recap is a paid Gemini call.
  */
 export async function POST(request: Request) {
   const db = getDb();
@@ -63,6 +66,10 @@ export async function POST(request: Request) {
       const cached = await getSummary(db, sessionId, attendeeId);
       if (cached) return Response.json({ summary: toSummary(cached) });
     }
+
+    // Past the cache: this will be a paid generation — rate-limit it per IP.
+    const limit = checkRateLimit(RateLimitBucket.Summaries, getClientId(request));
+    if (!limit.ok) return rateLimitResponse(limit);
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {

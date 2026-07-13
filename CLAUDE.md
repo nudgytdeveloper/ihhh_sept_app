@@ -154,6 +154,7 @@ src/
 │  ├─ layout.tsx              # root: fonts, metadata, TooltipProvider, Toaster
 │  ├─ globals.css             # design tokens + brand utilities
 │  ├─ manifest.ts             # PWA manifest → /manifest.webmanifest (installable; icons in public/, Phase 5)
+│  ├─ error.tsx / global-error.tsx / not-found.tsx  # Navi-styled error + 404 boundaries (Phase 6)
 │  ├─ (attendee)/             # attendee shell (ambient bg, header, AttendeeShell: onboarding gate + live phase/reminders/leaderboard/headcount)
 │  │  ├─ layout.tsx
 │  │  ├─ page.tsx             # Screen 1 (/) — thin; renders navigator-home (live phase + onboarded persona)
@@ -177,6 +178,8 @@ src/
 │     ├─ transcribe/route.ts  # STT: POST audio → ElevenLabs Scribe (reuses ELEVENLABS_API_KEY) → {text}; 501 when unset; GET {configured}
 │     ├─ summaries/route.ts   # AI recaps: POST generate/cache (Gemini, per attendee goals; cache-hit needs no key) + GET list; [id] PATCH edit (Phase 4)
 │     ├─ push/                # Web Push (Phase 5): route.ts GET {configured, publicKey}; subscribe/ + unsubscribe/ POST
+│     ├─ host/verify/route.ts # Host passcode (Phase 6): GET {required} / POST {token} → {ok} (rate-limited)
+│     ├─ health/route.ts      # Health check (Phase 6): {status, database, time} — always 200 (Render healthCheckPath)
 │     └─ voice/route.ts       # Navi cloud TTS: POST a line → ElevenLabs (server-only key) → MP3; cached, 501 when unconfigured
 ├─ components/
 │  ├─ ui/                     # shadcn/ui primitives
@@ -198,6 +201,8 @@ src/
 │  ├─ sessions.ts             # SessionStatus, SESSION_STATUS_META, RECORDING_CONFIG, SCRIBE_CONFIG, SttProvider/STT_PROVIDER, RecorderState, API paths
 │  ├─ summaries.ts            # SUMMARY_CONFIG (Gemini model/endpoint), SUMMARY_LIMITS, WHATSAPP_SHARE, API paths (Phase 4)
 │  ├─ push.ts                 # PushStatus, VAPID_ENV, PUSH_* API paths, SW path/scope, notification copy/tags (Phase 5)
+│  ├─ host-auth.ts            # HostAuthStatus, HOST_TOKEN_HEADER, HOST_ONLY_MESSAGE_TYPES, verify path (Phase 6)
+│  ├─ rate-limit.ts           # RateLimitBucket + RATE_LIMITS per costly/abusable route (Phase 6)
 │  └─ index.ts                # barrel
 ├─ utils/                     # ⚠️ all reusable functions live here (see rules)
 │  ├─ format.ts               # formatCountdown, formatScore, getInitials, template
@@ -215,6 +220,7 @@ src/
 │  ├─ use-session-recorder.ts # useSessionRecorder — live STT recorder (Web Speech | Scribe MediaRecorder segments) → onSegment
 │  ├─ summaries.ts            # recap helpers: isSummarizable, indexSummariesBySession, buildWhatsAppShareUrl (Phase 4)
 │  ├─ push.ts                 # "use client" push store + usePushSubscription (register SW, permission→subscribe→persist) (Phase 5)
+│  ├─ host-auth.ts            # "use client" host passcode store + useHostAuth + getStoredHostToken (Phase 6)
 │  └─ index.ts                # barrel
 ├─ lib/
 │  └─ utils.ts                # shadcn `cn()` helper ONLY (ecosystem convention)
@@ -222,6 +228,9 @@ src/
 │  ├─ game-hub.ts             # in-memory SSE pub/sub hub: host state + event phase + subscribers + aggregated leaderboard + live presence headcount (refcounted per device)
 │  ├─ ai/
 │  │  └─ summary.ts           # generateSummary — Gemini (Google Generative Language API via fetch) recap keyed to goals; retries; throws on failure (Phase 4)
+│  ├─ host-auth.ts            # isHostAuthRequired + isValidHostToken (constant-time; open when HOST_TOKEN unset) (Phase 6)
+│  ├─ rate-limit.ts           # in-memory fixed-window limiter: checkRateLimit/getClientId/rateLimitResponse (Phase 6)
+│  ├─ env.ts                  # startup env summary (which features on/off; warns in prod) — logged via instrumentation (Phase 6)
 │  ├─ push/
 │  │  └─ send.ts              # web-push sender (VAPID + aes128gcm): sendPushToAll/sendPhasePush/sendReminderPush; prunes 404/410 subs (Phase 5)
 │  └─ db/                     # Postgres persistence (Drizzle) — Nov event
@@ -235,9 +244,13 @@ src/
 ├─ types/
 │  ├─ index.ts                # shared TS types (Attendee, ScheduleItem, GameSession, GameSessionState, ScoreEntry, RosterEntry, Session, Summary, …)
 │  └─ speech-recognition.d.ts # ambient Web Speech API types (SpeechRecognition — not in TS DOM lib yet)
-└─ data/
-   └─ event.ts                # mock demo data (attendee, schedule, leaderboard, state)
+├─ data/
+│  └─ event.ts                # mock demo data (attendee, schedule, leaderboard, state)
+└─ instrumentation.ts         # Next register() hook — logs the startup env summary (Phase 6)
 ```
+
+Repo root also holds `next.config.ts` (security headers / CSP, Phase 6) and
+`render.yaml` (infra-as-code deploy Blueprint, Phase 6).
 
 ### Repo rules (from global `~/.claude/CLAUDE.md`) — follow exactly
 
@@ -623,7 +636,57 @@ Build order: **Phase 1 — registration + Postgres (✅ done, see above)** ·
 **Phase 3 — speaker sessions + STT (✅ done, below)** ·
 **Phase 4 — AI summaries (Gemini) + WhatsApp share (✅ done, below)** ·
 **Phase 5 — PWA + Web Push notifications (✅ done, below)** ·
-Phase 6 — hardening/deploy.
+**Phase 6 — hardening/deploy (✅ done, below)**. **All 6 phases complete.**
+
+**Phase 6 — hardening (built).** The demo→event hardening pass, in five parts:
+
+- **Host control-room passcode.** A server-only `HOST_TOKEN` locks the host down.
+  Only a device that entered the passcode may drive the event — phase, reminders,
+  game state, countdown — and, crucially, fan a **push notification to every
+  phone**. `/api/game/publish` now 401s those host-only message types
+  (`HOST_ONLY_MESSAGE_TYPES`) unless a valid `x-host-token` header is present;
+  attendee **score** posts are exempt, so attendees never need the passcode.
+  `src/server/host-auth.ts` (constant-time compare; **open when `HOST_TOKEN` is
+  unset** — local dev / trusted demo), `/api/host/verify` (GET `{required}` / POST
+  `{ok}`), client store `src/utils/host-auth.ts` (`useHostAuth`, `HostAuthStatus`)
+  → the passcode gate `src/components/host/host-gate.tsx` wraps `/host/*` in the
+  host layout. The SSE transport (`src/utils/realtime.ts`) attaches the stored
+  passcode to publish requests automatically (attendees have none). Copy/constants
+  in `src/constants/host-auth.ts`.
+- **Rate limiting.** In-memory per-IP fixed-window limits (`src/server/rate-limit.ts`,
+  buckets/limits in `src/constants/rate-limit.ts`) on the **costly/abusable**
+  routes only — summaries (Gemini $), transcribe (ElevenLabs $), register,
+  push-subscribe, and host-verify (brute-force guard) — returning **429 +
+  Retry-After**. The cheap realtime **score/publish path is deliberately NOT
+  limited**: at a venue every attendee shares one NAT/public IP, so an IP limit
+  there would throttle real players (host actions are protected by the passcode
+  instead). Single-instance (matches the hub); swap for Redis if scaled out.
+- **Security headers** (`next.config.ts`, every route): a CSP tuned to what the app
+  loads (`'self'` + `'unsafe-inline'` for Next's hydration/Tailwind — nonces would
+  force every page dynamic; `connect-src 'self'` for SSE; `worker-src 'self'` for
+  the SW; `frame-ancestors 'none'`; data:/blob: for icons + voice clips), plus
+  HSTS (prod only), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy`, and a `Permissions-Policy` that allows only `microphone=(self)`
+  (host STT) + `autoplay=(self)` (Navi voice).
+- **Error boundaries + health + env validation.** Navi-styled `src/app/error.tsx`
+  (retry) / `global-error.tsx` (inline-styled last resort) / `not-found.tsx`, a
+  `/api/health` endpoint (reports DB reachability but **always 200** so a DB blip
+  doesn't drop the service from rotation), and `src/instrumentation.ts` →
+  `src/server/env.ts` logging a startup summary of which features are on/off
+  (warns when `HOST_TOKEN`/`DATABASE_URL` are unset in production).
+- **`render.yaml`** — infra-as-code for the web service (build/start commands,
+  `healthCheckPath: /api/health`, declared env vars; secrets stay `sync: false`).
+
+Verified against a production build (`next start`, `HOST_TOKEN` set) + real local
+Postgres: **24/24** — all security headers present (CSP incl. `frame-ancestors
+'none'`, no `unsafe-eval` in prod), health 200 + DB ok, host verify
+(required/wrong/correct), publish **401 without passcode / 200 with / score open**,
+rate-limit **429 + Retry-After** after the bucket, and the 404 boundary. In-browser
+the app **renders + hydrates under the production CSP with zero violations / no
+console errors**, and the passcode gate shows on `/host` with the control panel
+content hidden behind it. Startup env summary logged as expected.
+**Deploy note:** set `HOST_TOKEN` on Render (the host enters that passcode once);
+without it the control room stays open. No DB migration this phase.
 
 **Phase 5 — PWA install + Web Push notifications (built).** This is the "phone
 notifications for next event timelines" requirement: attendees opt in, and the
@@ -802,7 +865,7 @@ SSE connection was open and false after close, roster ordering + search filter
 + 430px no-overflow (measured `scrollWidth === innerWidth` in-browser; only
 the table scrolls, inside its own container).
 
-## Status — June demo complete 🎉 · Nov MVP features complete
+## Status — June demo complete 🎉 · Nov MVP complete · all 6 phases done ✅
 
 All **5 demo screens are built** (see the scope table above), plus **cross-device
 realtime** host→attendee sync (SSE, Render-ready), a **shared live leaderboard**
@@ -810,12 +873,18 @@ realtime** host→attendee sync (SSE, Render-ready), a **shared live leaderboard
 voice, **attendee onboarding** (name + auto seat), and a **host-driven live event
 journey** (above).
 
-**All four Nov 2026 MVP features are now built** (registration, roster/attendance,
-speaker sessions + STT, AI recaps, **and phone notifications / PWA — Phase 5**).
-Of the 6-phase Nov build order, only **Phase 6 (hardening/deploy)** remains — not
-yet requested. `ScreenStub` (`src/components/scaffold`) is unused — keep it for any
-future scaffolding. Remaining ideas (not yet requested): multi-instance scaling
-(swap the in-memory hub for Redis pub/sub behind the same `GameChannel` seam — and
+**All four Nov 2026 MVP features are built AND the full 6-phase build order is
+complete**: registration, roster/attendance, speaker sessions + STT, AI recaps,
+phone notifications / PWA (Phase 5), and the **hardening pass (Phase 6)** — host
+passcode, rate limiting, security headers, error boundaries + health, `render.yaml`.
+Phases 1–5 are **deployed + live** on Render; **Phase 6 code is built + verified
+locally** (24/24) — to finish deploying it, **set `HOST_TOKEN` on the Render web
+service** (the host enters that passcode) so the control room isn't open; the rest
+of Phase 6 needs no config.
+
+`ScreenStub` (`src/components/scaffold`) is unused — keep it for any future
+scaffolding. Remaining ideas (not yet requested): multi-instance scaling (swap the
+in-memory hub + the in-memory rate limiter for Redis behind their current seams —
 the same swap would move `push_subscriptions` fan-out off the single instance),
 persisting hub state (phase + board) across server restarts, and the remaining
 (post-demo) modules beyond these 5.

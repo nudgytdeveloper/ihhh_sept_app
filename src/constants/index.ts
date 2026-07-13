@@ -15,3 +15,5 @@ export * from "./roster";
 export * from "./sessions";
 export * from "./summaries";
 export * from "./push";
+export * from "./host-auth";
+export * from "./rate-limit";

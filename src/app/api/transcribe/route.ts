@@ -1,4 +1,6 @@
+import { checkRateLimit, getClientId, rateLimitResponse } from "@/server/rate-limit";
 import { SCRIBE_CONFIG } from "@/constants/sessions";
+import { RateLimitBucket } from "@/constants/rate-limit";
 import type { TranscribeResponse } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +39,9 @@ async function fetchScribe(init: RequestInit): Promise<Response | null> {
 }
 
 export async function POST(request: Request) {
+  const limit = checkRateLimit(RateLimitBucket.Transcribe, getClientId(request));
+  if (!limit.ok) return rateLimitResponse(limit);
+
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
     return Response.json({ ok: false, error: "transcription not configured" }, { status: 501 });

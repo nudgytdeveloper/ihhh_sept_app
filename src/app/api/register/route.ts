@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/server/db";
 import { upsertAttendee } from "@/server/db/attendees";
+import { checkRateLimit, getClientId, rateLimitResponse } from "@/server/rate-limit";
 import { REGISTRATION_LIMITS } from "@/constants/registration";
+import { RateLimitBucket } from "@/constants/rate-limit";
 import { isValidEmail, normalizeEmail, sanitizeLearningGoals } from "@/utils/registration";
 import type { RegisteredAttendee, SeatInfo } from "@/types";
 
@@ -19,6 +21,9 @@ export const dynamic = "force-dynamic";
  * keeps working — same graceful-fallback philosophy as `/api/voice`.
  */
 export async function POST(request: Request) {
+  const limit = checkRateLimit(RateLimitBucket.Register, getClientId(request));
+  if (!limit.ok) return rateLimitResponse(limit);
+
   let body: {
     playerId?: unknown;
     name?: unknown;

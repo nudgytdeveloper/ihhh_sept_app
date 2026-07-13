@@ -8,7 +8,9 @@ import {
 import { getDb } from "@/server/db";
 import { upsertBestScore } from "@/server/db/scores";
 import { sendPhasePush, sendReminderPush } from "@/server/push/send";
+import { isValidHostToken } from "@/server/host-auth";
 import { RealtimeMessage } from "@/constants/realtime";
+import { HOST_ONLY_MESSAGE_TYPES, HOST_TOKEN_HEADER } from "@/constants/host-auth";
 import type { EventPhase } from "@/constants/phases";
 import type { ScoreEntry } from "@/types";
 
@@ -24,6 +26,15 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") {
     return Response.json({ ok: false, error: "invalid body" }, { status: 400 });
+  }
+  // Host-only actions (phase / reminders / game state / countdown — anything that
+  // drives every attendee, incl. fanning a push to every phone) require the host
+  // passcode. Attendee score posts are exempt, so they never need it.
+  if (
+    HOST_ONLY_MESSAGE_TYPES.includes(body.type) &&
+    !isValidHostToken(request.headers.get(HOST_TOKEN_HEADER))
+  ) {
+    return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
   if (body.type === RealtimeMessage.State && body.state) {
     publishState(body.state);
