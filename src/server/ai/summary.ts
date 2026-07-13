@@ -2,9 +2,10 @@ import { SUMMARY_CONFIG } from "@/constants/summaries";
 import type { LearningGoals } from "@/types";
 
 /**
- * Personalized session-summary generation with Claude (Anthropic Messages API),
- * server-only. The route passes the secret ANTHROPIC_API_KEY (never bundled to
- * the client). Called only when no cached summary exists for this attendee.
+ * Personalized session-summary generation with Google Gemini (Generative
+ * Language API), server-only. The route passes the secret GEMINI_API_KEY (never
+ * bundled to the client). Called only when no cached summary exists for this
+ * attendee.
  */
 
 const SYSTEM_PROMPT = `You are the IHHH 2026 event companion — a warm, concise event host who writes a personalized recap of a conference talk for a single attendee, tailored to the learning goals they set at registration.
@@ -45,23 +46,24 @@ Transcript:
 ${transcript}
 """`;
 
+  const model = process.env.GEMINI_MODEL || SUMMARY_CONFIG.model;
+  const url = `${SUMMARY_CONFIG.endpointBase}/${model}:generateContent`;
   const body = JSON.stringify({
-    model: process.env.ANTHROPIC_MODEL || SUMMARY_CONFIG.model,
-    max_tokens: SUMMARY_CONFIG.maxTokens,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: userPrompt }],
+    system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+    generationConfig: {
+      maxOutputTokens: SUMMARY_CONFIG.maxOutputTokens,
+      // No "thinking" budget for a summary — keep the tokens for the recap itself.
+      thinkingConfig: { thinkingBudget: 0 },
+    },
   });
 
   let upstream: Response | null = null;
   for (let attempt = 0; attempt <= SUMMARY_CONFIG.retries; attempt++) {
     if (attempt > 0) await sleep(SUMMARY_CONFIG.retryDelayMs * attempt);
-    upstream = await fetch(SUMMARY_CONFIG.endpoint, {
+    upstream = await fetch(url, {
       method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": SUMMARY_CONFIG.anthropicVersion,
-        "content-type": "application/json",
-      },
+      headers: { "x-goog-api-key": apiKey, "content-type": "application/json" },
       body,
     }).catch(() => null);
     // Success or a permanent 4xx (bad key/model/quota) — stop; retrying won't help.
@@ -70,17 +72,17 @@ ${transcript}
 
   if (!upstream || !upstream.ok) {
     const detail = upstream ? await upstream.text().catch(() => "") : "network error";
-    throw new Error(`anthropic upstream failed: ${detail.slice(0, 200)}`);
+    throw new Error(`gemini upstream failed: ${detail.slice(0, 200)}`);
   }
 
   const data = (await upstream.json().catch(() => null)) as {
-    content?: Array<{ type?: string; text?: string }>;
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
   } | null;
-  const text = (data?.content ?? [])
-    .filter((block) => block.type === "text" && typeof block.text === "string")
-    .map((block) => block.text)
+  const text = (data?.candidates?.[0]?.content?.parts ?? [])
+    .filter((part) => typeof part.text === "string")
+    .map((part) => part.text)
     .join("")
     .trim();
-  if (!text) throw new Error("anthropic returned no text");
+  if (!text) throw new Error("gemini returned no text");
   return text;
 }

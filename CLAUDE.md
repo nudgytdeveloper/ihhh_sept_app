@@ -174,7 +174,7 @@ src/
 │     ├─ roster/route.ts      # host roster: attendees ⋈ best scores + online flags ({available:false} when no DB)
 │     ├─ sessions/route.ts    # speaker sessions: GET list / POST create; [id]/route.ts GET/PATCH/DELETE (Phase 3)
 │     ├─ transcribe/route.ts  # STT: POST audio → ElevenLabs Scribe (reuses ELEVENLABS_API_KEY) → {text}; 501 when unset; GET {configured}
-│     ├─ summaries/route.ts   # AI recaps: POST generate/cache (Claude, per attendee goals; cache-hit needs no key) + GET list; [id] PATCH edit (Phase 4)
+│     ├─ summaries/route.ts   # AI recaps: POST generate/cache (Gemini, per attendee goals; cache-hit needs no key) + GET list; [id] PATCH edit (Phase 4)
 │     └─ voice/route.ts       # Navi cloud TTS: POST a line → ElevenLabs (server-only key) → MP3; cached, 501 when unconfigured
 ├─ components/
 │  ├─ ui/                     # shadcn/ui primitives
@@ -193,7 +193,7 @@ src/
 │  ├─ registration.ts         # RegistrationStep, LEARNING_GOAL_PRESETS, REGISTRATION_LIMITS, REGISTER_API_PATH
 │  ├─ roster.ts               # ROSTER_API_PATH, ROSTER_REFRESH_MS, CSV filename/headers (host roster)
 │  ├─ sessions.ts             # SessionStatus, SESSION_STATUS_META, RECORDING_CONFIG, SCRIBE_CONFIG, SttProvider/STT_PROVIDER, RecorderState, API paths
-│  ├─ summaries.ts            # SUMMARY_CONFIG (Anthropic model/endpoint), SUMMARY_LIMITS, WHATSAPP_SHARE, API paths (Phase 4)
+│  ├─ summaries.ts            # SUMMARY_CONFIG (Gemini model/endpoint), SUMMARY_LIMITS, WHATSAPP_SHARE, API paths (Phase 4)
 │  └─ index.ts                # barrel
 ├─ utils/                     # ⚠️ all reusable functions live here (see rules)
 │  ├─ format.ts               # formatCountdown, formatScore, getInitials, template
@@ -216,7 +216,7 @@ src/
 ├─ server/                    # ⚠️ server-only (never imported by client / barrel)
 │  ├─ game-hub.ts             # in-memory SSE pub/sub hub: host state + event phase + subscribers + aggregated leaderboard + live presence headcount (refcounted per device)
 │  ├─ ai/
-│  │  └─ summary.ts           # generateSummary — Claude (Anthropic Messages API via fetch) recap keyed to goals; retries; throws on failure (Phase 4)
+│  │  └─ summary.ts           # generateSummary — Gemini (Google Generative Language API via fetch) recap keyed to goals; retries; throws on failure (Phase 4)
 │  └─ db/                     # Postgres persistence (Drizzle) — Nov event
 │     ├─ schema.ts            # attendees + game_scores + sessions + summaries (per session×attendee, FK-cascade, Phase 4)
 │     ├─ index.ts             # lazy getDb() (null when DATABASE_URL unset; Render TLS)
@@ -613,7 +613,7 @@ one host device records speakers, `wa.me` share links (no WhatsApp API).
 Build order: **Phase 1 — registration + Postgres (✅ done, see above)** ·
 **Phase 2 — roster/attendance + persistent scores (✅ done, below)** ·
 **Phase 3 — speaker sessions + STT (✅ done, below)** ·
-**Phase 4 — AI summaries (Claude) + WhatsApp share (✅ done, below)** ·
+**Phase 4 — AI summaries (Gemini) + WhatsApp share (✅ done, below)** ·
 Phase 5 — PWA + Web Push · Phase 6 — hardening/deploy.
 
 **Phase 4 — personalized AI session recaps + WhatsApp share (built).**
@@ -623,12 +623,14 @@ Phase 5 — PWA + Web Push · Phase 6 — hardening/deploy.
   Store in `src/server/db/summaries.ts`. The recap is personalized to the
   attendee's learning goals (server prefers the stored `attendees.goals`, falls
   back to goals sent by the client).
-- **Generation (Claude).** `src/server/ai/summary.ts` calls the **Anthropic
-  Messages API via `fetch`** (no SDK dependency — same proxy pattern as
-  voice/transcribe). Model default `claude-sonnet-5` (override `ANTHROPIC_MODEL`;
-  bump to `claude-opus-4-8` for max quality). The prompt asks for a short
-  plain-text recap + "Key points" + "Your action items" tied to the goals,
-  grounded in the transcript. `ANTHROPIC_API_KEY` is server-only.
+- **Generation (Gemini).** `src/server/ai/summary.ts` calls the **Google
+  Generative Language API via `fetch`** (no SDK dependency — same proxy pattern
+  as voice/transcribe; auth via the `x-goog-api-key` header, model in the URL
+  path, `thinkingBudget: 0`). Model default `gemini-2.5-flash` (override
+  `GEMINI_MODEL`; bump to `gemini-2.5-pro` for max quality). The prompt asks for
+  a short plain-text recap + "Key points" + "Your action items" tied to the
+  goals, grounded in the transcript. `GEMINI_API_KEY` is server-only.
+  (Provider was switched from Claude to Gemini — the client had no Anthropic key.)
 - **Routes.** `POST /api/summaries` returns the **cached** summary if one exists
   (no key needed) — otherwise generates, stores, returns (needs the key; 501
   when unset; `regenerate: true` forces a fresh one). `GET /api/summaries?attendeeId=`
@@ -641,10 +643,10 @@ Phase 5 — PWA + Web Push · Phase 6 — hardening/deploy.
   (`wa.me/?text=` click-to-chat, `buildWhatsAppShareUrl`; no WhatsApp API,
   per the Nov decision). Regenerate re-runs Claude.
 
-**IMPORTANT — `ANTHROPIC_API_KEY` is prod-only** (like `ELEVENLABS_API_KEY`):
+**IMPORTANT — `GEMINI_API_KEY` is prod-only** (like `ELEVENLABS_API_KEY`):
 set it in Render's env, not local `.env.local`. So `/api/summaries` **generation**
 returns 501 locally and the recaps screen shows a friendly "not switched on yet"
-notice; the real Claude generation path is verified in production. **Cache hits,
+notice; the real Gemini generation path is verified in production. **Cache hits,
 editing, listing, and WhatsApp share all work with no key** (no generation
 needed), so those are fully verified locally.
 

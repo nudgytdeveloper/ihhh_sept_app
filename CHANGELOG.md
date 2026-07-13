@@ -3,7 +3,7 @@
 ## 2026-07-13
 
 ### Added
-- Personalized AI session recaps + WhatsApp share (Nov Phase 4): `summaries` table (per session × attendee, FK-cascade), `/api/summaries` (POST generate/cache — Claude via Anthropic Messages API, keyed to the attendee's learning goals; cache-hit needs no key; 501 when unset) + GET list + `[id]` PATCH edit
+- Personalized AI session recaps + WhatsApp share (Nov Phase 4): `summaries` table (per session × attendee, FK-cascade), `/api/summaries` (POST generate/cache — Google Gemini, keyed to the attendee's learning goals; cache-hit needs no key; 501 when unset) + GET list + `[id]` PATCH edit
 - Attendee "Session recaps" screen at `/recaps` (+ home entry card): generate a recap per recorded talk, edit it, share to WhatsApp via `wa.me`; server summarizer `src/server/ai/summary.ts`
 - Summaries constants/helpers (`src/constants/summaries.ts`, `src/utils/summaries.ts`: `buildWhatsAppShareUrl`, `isSummarizable`), `Summary`/`SummaryResponse`/`SummaryListResponse` types, `ROUTES.RECAPS`, `getAttendeeById`
 - Speaker sessions + live speech-to-text (Nov Phase 3): `sessions` table + `/api/sessions` CRUD (`[id]` PATCH/DELETE) and `/api/transcribe` (ElevenLabs Scribe proxy, reuses `ELEVENLABS_API_KEY`, 501 when unset)
@@ -15,6 +15,9 @@
 - `/api/roster` — every registered attendee with attendance mark, best score, and live online flag
 - Host roster screen at `/host/roster`: stat cards (registered / checked in / online / played), searchable attendee table, auto-refresh, CSV export; host header nav tabs (Control panel / Roster)
 - Roster constants (`src/constants/roster.ts`), CSV + roster helpers (`src/utils/csv.ts`, `src/utils/roster.ts`), `RosterEntry`/`RosterResponse` types, `ROUTES.HOST_ROSTER`
+
+### Changed
+- AI recap provider swapped from Claude (Anthropic) to Google Gemini (`gemini-2.5-flash`, `GEMINI_API_KEY`) — the client has no Anthropic key
 
 ### Fixed
 - Render deploy failure (`ERR_PNPM_OUTDATED_LOCKFILE`): synced `pnpm-lock.yaml` with the Phase 1 dependencies added via npm

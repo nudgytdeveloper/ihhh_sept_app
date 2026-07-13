@@ -64,7 +64,7 @@ export async function POST(request: Request) {
       if (cached) return Response.json({ summary: toSummary(cached) });
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return Response.json({ ok: false, error: "summaries not configured" }, { status: 501 });
     }
