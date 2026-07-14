@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-07-14
+
+### Changed
+- Client-facing `/flows` page: added a "Two sides, one app" signpost under the hero — tap-to-jump cards for **For guests** + **For your team** — so both audiences are obvious up front (on mobile the two lanes stack and the team section previously fell below the fold, reading as guests-only); lede now leads with "two sides", lanes get `#guests`/`#team` anchors
+
 ## 2026-07-13
 
 ### Added
