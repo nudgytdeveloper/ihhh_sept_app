@@ -3,7 +3,8 @@
 ## 2026-07-14
 
 ### Changed
-- Client-facing `/flows` page: added a "Two sides, one app" signpost under the hero — tap-to-jump cards for **For guests** + **For your team** — so both audiences are obvious up front (on mobile the two lanes stack and the team section previously fell below the fold, reading as guests-only); lede now leads with "two sides", lanes get `#guests`/`#team` anchors
+- Client-facing `/flows` page: the "Two sides" signpost cards + footer now **link to the live apps** — For guests → `/` (guest view), For your team → `/host` (control room), each opening in a new tab with an ↗; footer replaced the single guest "Try it live" with two buttons (Guest view · Team control · /host). Regenerated the 1-page PDF to match
+- Client-facing `/flows` page: added a "Two sides, one app" signpost under the hero — cards for **For guests** + **For your team** — so both audiences are obvious up front (on mobile the two lanes stack and the team section previously fell below the fold, reading as guests-only); lede now leads with "two sides"
 
 ## 2026-07-13
 
