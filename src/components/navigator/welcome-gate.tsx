@@ -6,7 +6,7 @@ import { AvatarHost } from "@/components/navigator/avatar-host";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { AVATAR_NAME, EVENT_NAME } from "@/constants/app";
+import { AVATAR_NAME, EVENT_DATE_LABEL, EVENT_NAME, EVENT_VENUE } from "@/constants/app";
 import {
   LEARNING_GOAL_PRESETS,
   REGISTRATION_LIMITS,
@@ -88,6 +88,9 @@ export function WelcomeGate() {
             <>
               <p className="text-sm font-semibold text-brand-blue">
                 Welcome to {EVENT_NAME} 👋
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {EVENT_DATE_LABEL} · {EVENT_VENUE}
               </p>
               <p className="mt-1.5 text-pretty text-lg font-medium leading-snug text-foreground">
                 So glad you&apos;re here! I&apos;ve saved you a seat — let&apos;s

@@ -1,3 +1,4 @@
+import { EVENT_NAME } from "./app";
 import { EventPhase } from "./phases";
 import { ROUTES } from "./routes";
 import { AvatarMood, ActionIntent } from "./statuses";
@@ -34,7 +35,7 @@ export interface AvatarScript {
 export const AVATAR_SCRIPTS: Record<EventPhase, AvatarScript> = {
   [EventPhase.Registered]: {
     phase: EventPhase.Registered,
-    greeting: "Welcome to IHHH 2026 👋",
+    greeting: `Welcome to ${EVENT_NAME} 👋`,
     message:
       "Great to have you here, {name}! You're all checked in. Take a look at today's plan and I'll guide you the rest of the way.",
     mood: AvatarMood.Welcoming,
@@ -101,7 +102,7 @@ export const AVATAR_SCRIPTS: Record<EventPhase, AvatarScript> = {
     phase: EventPhase.Closing,
     greeting: "That's a wrap! 🎉",
     message:
-      "What a day, {name}! Thanks for being part of IHHH 2026. Catch the closing highlights before you go.",
+      `What a day, {name}! Thanks for being part of ${EVENT_NAME}. Catch the closing highlights before you go.`,
     mood: AvatarMood.Celebrating,
     action: {
       label: "View closing details",

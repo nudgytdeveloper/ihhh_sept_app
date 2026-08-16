@@ -13,6 +13,8 @@
 - Seat-map design tokens (light + dark) and `seat-pulse` / `seat-ping` / `seat-callout-in` keyframes in `globals.css`; `AttendeeRole`, `SeatRow`, `SeatBlock`, `SeatZone`, `SeatCellStatus`, `MapView` enums
 
 ### Changed
+- Event identity set to the real details: **IHHSG LEARNING FESTIVAL 2026**, 2 September 2026 at the Gleneagles Hospital Lecture Theatre — `EVENT_NAME` (in-sentence) / `EVENT_FULL_NAME` (branded caps) / `EVENT_DATE_ISO` / `EVENT_DATE_LABEL`, replacing the "IHHH 2026" placeholder; date + venue now shown on the welcome step
+- Hardcoded "IHHH 2026" literals in the page title, avatar scripts, phase copy, the AI recap prompt and `public/flows.html` now read from the constants
 - Seats are now issued by the **server** at registration: an email on the attendance list keeps the seat IHH designated for it, anyone else is auto-allocated the next free seat (back of the centre block first) — replacing the random `Zone B · Table 7 · Seat 3` allocation that ran per-device
 - `attendees` gains `seat_id` (unique — one person per seat, so a double-booking 409s instead of silently overwriting) and `role`; the old `seat` jsonb is kept read-only for rows registered before the seat map
 - Attendance CSV export gains a Role column and writes the bare seat id, so an export can be edited in Excel and imported straight back

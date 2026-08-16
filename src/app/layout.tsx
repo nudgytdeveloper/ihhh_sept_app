@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Sora, Geist_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
-import { APP_NAME, APP_SHORT_NAME, APP_TAGLINE } from "@/constants/app";
+import { APP_NAME, APP_SHORT_NAME, APP_TAGLINE, EVENT_FULL_NAME } from "@/constants/app";
 import "./globals.css";
 
 const fontSans = Plus_Jakarta_Sans({
@@ -25,7 +25,7 @@ const fontMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: `${APP_NAME} — IHHH 2026`,
+    default: `${APP_NAME} — ${EVENT_FULL_NAME}`,
     template: `%s · ${APP_NAME}`,
   },
   description: APP_TAGLINE,

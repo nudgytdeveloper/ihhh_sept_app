@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { EVENT_NAME } from "./app";
 import {
   BadgeCheck,
   Armchair,
@@ -131,7 +132,7 @@ export const PHASE_META: Record<EventPhase, PhaseMeta> = {
     id: EventPhase.Closing,
     label: "Closing",
     shortLabel: "Closing",
-    description: "That's a wrap — thanks for joining IHHH 2026!",
+    description: `That's a wrap — thanks for joining ${EVENT_NAME}!`,
     time: "2:00 PM",
     icon: PartyPopper,
     accent: {
