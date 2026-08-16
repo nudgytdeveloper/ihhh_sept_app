@@ -43,6 +43,26 @@ export const HOST_REMINDERS: readonly HostReminder[] = [
   },
 ] as const;
 
+/**
+ * Copy for the host's game-data controls. Scores accumulate across rounds, so
+ * the two actions are deliberately different: a session reset banks the round
+ * and opens a new one, while clearing wipes the event's scores for good.
+ */
+export const GAME_DATA_CONTROLS = {
+  title: "Game data",
+  description:
+    "Scores add up across rounds. A session reset keeps them; clearing wipes them.",
+  resetLabel: "Reset game session",
+  resetDetail: "Open a fresh round — scores are kept",
+  clearLabel: "Clear all game data",
+  clearDetail: "Erase every score — cannot be undone",
+  confirmTitle: "Clear all game data?",
+  confirmBody:
+    "This permanently erases every attendee's score for the event, on the live leaderboard and in the database. Attendees will drop to zero and the roster will show no scores. This cannot be undone.",
+  confirmCancel: "Keep the scores",
+  confirmAction: "Yes, clear everything",
+} as const;
+
 /** Severity/tone of an entry in the host activity log. */
 export enum LogTone {
   Info = "info",

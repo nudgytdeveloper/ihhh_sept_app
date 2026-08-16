@@ -102,9 +102,20 @@ export function useGameChannel(handlers: GameChannelHandlers = {}) {
     channelRef.current?.publishPhase(phase);
   }, []);
 
+  const clearScores = useCallback(() => {
+    channelRef.current?.clearScores();
+  }, []);
+
   const publishCountdown = useCallback((seconds: number) => {
     channelRef.current?.publishCountdown(seconds);
   }, []);
 
-  return { publishState, pushReminder, publishScore, publishPhase, publishCountdown };
+  return {
+    publishState,
+    pushReminder,
+    publishScore,
+    publishPhase,
+    publishCountdown,
+    clearScores,
+  };
 }

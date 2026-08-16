@@ -21,13 +21,7 @@ import {
 import { getAvatarScript } from "@/utils/event";
 import { toLeaderboard } from "@/utils/game";
 import { attendeeFromIdentity, usePlayerIdentity } from "@/utils/player-identity";
-import { MOCK_EVENT_STATE, MOCK_LEADERBOARD, MOCK_REMINDERS } from "@/data/event";
-
-/** Idle teaser for the leaderboard peek before any live scores arrive (no "You"). */
-const SAMPLE_LEADERBOARD = MOCK_LEADERBOARD.map((entry) => ({
-  ...entry,
-  isCurrentUser: false,
-}));
+import { MOCK_EVENT_STATE, MOCK_REMINDERS } from "@/data/event";
 
 /**
  * Screen 1 — Attendee Navigator Home. The avatar host leads with a single next
@@ -47,9 +41,9 @@ export function NavigatorHome() {
   // The preview's live badge reflects the real host status, not the mock seed.
   const game = { ...MOCK_EVENT_STATE.game, status: gameStatus };
 
-  // The peek shows the real shared board once scores arrive; until then a sample.
-  const leaderboard =
-    liveScores.length > 0 ? toLeaderboard(liveScores, identity.id) : SAMPLE_LEADERBOARD;
+  // Always the real shared board — a sample teaser here made the home peek
+  // disagree with the host roster, which read as a bug to the client.
+  const leaderboard = toLeaderboard(liveScores, identity.id);
 
   // Live count of connected attendees; this device is always at least 1 (and over
   // the same-browser fallback, which can't aggregate, it's the only count we have).

@@ -6,7 +6,12 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MiniVirus } from "@/components/game/mini-virus";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
-import { GAME_NAME, GAME_CONFIG, GameStatus } from "@/constants/game";
+import {
+  GAME_NAME,
+  GAME_CONFIG,
+  GameStatus,
+  LEADERBOARD_EMPTY,
+} from "@/constants/game";
 import { formatScore } from "@/utils/format";
 import type { GameSession, LeaderboardEntry } from "@/types";
 
@@ -86,6 +91,15 @@ export function GamePreviewCard({
           <p className="text-sm font-semibold">Live leaderboard</p>
           <p className="text-xs text-muted-foreground">Top players right now</p>
         </div>
+
+        {top.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border/70 px-4 py-5 text-center">
+            <p className="text-sm font-medium">{LEADERBOARD_EMPTY.title}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {LEADERBOARD_EMPTY.detail}
+            </p>
+          </div>
+        ) : null}
 
         <ul className="space-y-1.5">
           {top.map((entry) => (

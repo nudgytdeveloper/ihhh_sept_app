@@ -1,5 +1,6 @@
 import {
   addSubscriber,
+  ensureScoresHydrated,
   getCurrentPhase,
   getCurrentState,
   getLeaderboard,
@@ -19,6 +20,10 @@ export const runtime = "nodejs";
  * host connects without one and is not counted.
  */
 export async function GET(request: Request) {
+  // Restore persisted totals before replaying the board, so a client that
+  // connects right after a restart sees real scores rather than an empty board.
+  await ensureScoresHydrated();
+
   const playerId = new URL(request.url).searchParams.get("playerId") ?? undefined;
   // Attendance: a registered attendee's first live connection is the check-in.
   // Fire-and-forget — the stream must never wait on (or fail with) the database.

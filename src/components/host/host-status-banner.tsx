@@ -84,7 +84,7 @@ export function HostStatusBanner({
           </Button>
           <Button variant="ghost" onClick={onReset} className="text-muted-foreground">
             <RotateCcw className="size-4" />
-            Reset
+            Reset session
           </Button>
         </div>
       </div>

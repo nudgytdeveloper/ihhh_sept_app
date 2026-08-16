@@ -5,6 +5,12 @@ import { Circle, Star, Triangle, Square } from "lucide-react";
 export const GAME_NAME = "Virus Fight";
 export const BOSS_NAME = "COVID Boss";
 
+/** Shown on the home leaderboard peek before anyone has scored. */
+export const LEADERBOARD_EMPTY = {
+  title: "No scores yet",
+  detail: "Play a round and you'll be the first on the board.",
+} as const;
+
 /**
  * Game lifecycle. Host transitions these from the control panel;
  * attendees react to them in the lobby / game screen.

@@ -1,4 +1,6 @@
 import {
+  clearAllScores,
+  ensureScoresHydrated,
   publishCountdown,
   publishPhase,
   publishReminder,
@@ -6,7 +8,7 @@ import {
   submitScore,
 } from "@/server/game-hub";
 import { getDb } from "@/server/db";
-import { upsertBestScore } from "@/server/db/scores";
+import { deleteAllScores, upsertTotalScore } from "@/server/db/scores";
 import { sendPhasePush, sendReminderPush } from "@/server/push/send";
 import { isValidHostToken } from "@/server/host-auth";
 import { RealtimeMessage } from "@/constants/realtime";
@@ -23,6 +25,10 @@ export const runtime = "nodejs";
  * shared leaderboard the server fans back out via the SSE stream).
  */
 export async function POST(request: Request) {
+  // A score posted right after a restart must add to the persisted total, not
+  // start a fresh one from zero.
+  await ensureScoresHydrated();
+
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") {
     return Response.json({ ok: false, error: "invalid body" }, { status: 400 });
@@ -43,7 +49,15 @@ export async function POST(request: Request) {
     // Also push it to phones (even backgrounded/closed) — fire-and-forget.
     void sendReminderPush(body.reminderId).catch(() => {});
   } else if (body.type === RealtimeMessage.Score && body.entry) {
-    if (submitScore(body.entry)) persistScore(body.entry);
+    // The hub returns the player's new cumulative event total — persist that,
+    // not the round score, so the roster and the live board always agree.
+    const total = submitScore(body.entry);
+    if (total !== null) {
+      persistScore({ ...(body.entry as ScoreEntry), score: total });
+    }
+  } else if (body.type === RealtimeMessage.ClearScores) {
+    clearAllScores();
+    void purgeScores();
   } else if (body.type === RealtimeMessage.Phase && typeof body.phase === "string") {
     publishPhase(body.phase);
     // "What's next" phone notification for every attendee — fire-and-forget.
@@ -64,7 +78,16 @@ export async function POST(request: Request) {
 function persistScore(entry: ScoreEntry): void {
   const db = getDb();
   if (!db) return;
-  void upsertBestScore(db, entry).catch((error) => {
+  void upsertTotalScore(db, entry).catch((error) => {
     console.error("score persist failed", error);
+  });
+}
+
+/** Host wiped all game data — drop the persisted rows too. Irreversible. */
+async function purgeScores(): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  await deleteAllScores(db).catch((error) => {
+    console.error("score purge failed", error);
   });
 }

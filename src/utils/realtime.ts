@@ -36,6 +36,7 @@ interface Transport {
   publishScore(entry: ScoreEntry): void;
   publishPhase(phase: EventPhase): void;
   publishCountdown(seconds: number): void;
+  clearScores(): void;
   requestState(): void;
   close(): void;
 }
@@ -70,6 +71,10 @@ class BroadcastTransport implements Transport {
   }
   publishCountdown(seconds: number): void {
     this.channel?.postMessage({ type: RealtimeMessage.Countdown, seconds });
+  }
+  clearScores(): void {
+    // No server to purge in same-browser mode; relayed for completeness.
+    this.channel?.postMessage({ type: RealtimeMessage.ClearScores });
   }
   requestState(): void {
     this.channel?.postMessage({ type: RealtimeMessage.RequestState });
@@ -155,6 +160,9 @@ class SseTransport implements Transport {
   publishCountdown(seconds: number): void {
     this.post({ type: RealtimeMessage.Countdown, seconds });
   }
+  clearScores(): void {
+    this.post({ type: RealtimeMessage.ClearScores });
+  }
   requestState(): void {
     // No-op: the server replays the current state + board to every new EventSource.
   }
@@ -175,6 +183,7 @@ class NoopTransport implements Transport {
   publishScore(): void {}
   publishPhase(): void {}
   publishCountdown(): void {}
+  clearScores(): void {}
   requestState(): void {}
   close(): void {}
 }
@@ -218,6 +227,10 @@ export class GameChannel {
   }
   publishCountdown(seconds: number): void {
     this.transport.publishCountdown(seconds);
+  }
+  /** Host wiped every score for the event (board + persisted rows). */
+  clearScores(): void {
+    this.transport.clearScores();
   }
   requestState(): void {
     this.transport.requestState();

@@ -27,6 +27,7 @@ export const HOST_ONLY_MESSAGE_TYPES: readonly RealtimeMessage[] = [
   RealtimeMessage.Reminder,
   RealtimeMessage.Phase,
   RealtimeMessage.Countdown,
+  RealtimeMessage.ClearScores,
 ];
 
 /** Where the host device stands with respect to the control-room gate. */

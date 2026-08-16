@@ -16,6 +16,7 @@ import { HostStatusBanner } from "@/components/host/host-status-banner";
 import { EventJourneyControl } from "@/components/host/event-journey-control";
 import { BossControl } from "@/components/host/boss-control";
 import { HostLeaderboard } from "@/components/host/host-leaderboard";
+import { GameDataControl } from "@/components/host/game-data-control";
 import { HostActivityLog, type LogEntry } from "@/components/host/host-activity-log";
 import { ConfettiBurst } from "@/components/effects/confetti";
 import { CountdownOverlay } from "@/components/effects/countdown-overlay";
@@ -31,7 +32,13 @@ import {
   BOSS_NAME,
 } from "@/constants/game";
 import { EventPhase, PHASE_ORDER, PHASE_META } from "@/constants/phases";
-import { LogTone, HOST_REMINDERS, CELEBRATION, type HostReminder } from "@/constants/host";
+import {
+  LogTone,
+  HOST_REMINDERS,
+  CELEBRATION,
+  GAME_DATA_CONTROLS,
+  type HostReminder,
+} from "@/constants/host";
 import { getHostControls, getWinner, toLeaderboard } from "@/utils/game";
 import { useGameChannel } from "@/utils/use-game-channel";
 import { useCountdown } from "@/utils/use-countdown";
@@ -95,7 +102,13 @@ export function HostControlPanel() {
     [status, activeBossShape, waves, locked, winner],
   );
   const sessionRef = useRef(session);
-  const { publishState, pushReminder, publishPhase, publishCountdown } = useGameChannel({
+  const {
+    publishState,
+    pushReminder,
+    publishPhase,
+    publishCountdown,
+    clearScores,
+  } = useGameChannel({
     getStateForSync: () => sessionRef.current,
     onLeaderboard: setLiveScores,
     onPhase: setPhase,
@@ -192,6 +205,8 @@ export function HostControlPanel() {
     addLog("Game ended", LogTone.Warn);
   }
 
+  // Opens a fresh round. The server banks each player's round score into their
+  // running total first, so nobody loses points — only "clear all" wipes those.
   function handleReset() {
     window.clearTimeout(countdownStartTimer.current);
     setStatus(GameStatus.Lobby);
@@ -199,8 +214,18 @@ export function HostControlPanel() {
     setLocked(false);
     setActiveBossShape(null);
     setWinner(null);
-    toast("New game ready", { description: "Lobby open for the next round." });
-    addLog("Reset to lobby", LogTone.Info);
+    toast("New round ready", { description: "Lobby open — scores so far are kept." });
+    addLog("Reset the game session (scores kept)", LogTone.Info);
+  }
+
+  /** Wipes every score for the event, in memory and in the database. */
+  function handleClearAll() {
+    handleReset();
+    clearScores();
+    toast.warning(GAME_DATA_CONTROLS.clearLabel, {
+      description: "Every attendee score has been erased.",
+    });
+    addLog("Cleared all game data — every score erased", LogTone.Danger);
   }
 
   function handleSelectPhase(next: EventPhase) {
@@ -287,6 +312,9 @@ export function HostControlPanel() {
               />
             </div>
           </div>
+
+              {/* Game data — reset the round vs wipe every score */}
+          <GameDataControl onResetSession={handleReset} onClearAll={handleClearAll} />
 
           {/* Reminders */}
           <Card data-tour={TourAnchor.HostReminders}>

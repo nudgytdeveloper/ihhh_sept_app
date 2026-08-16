@@ -29,6 +29,8 @@ export enum RealtimeMessage {
   Presence = "presence",
   /** Host firing a synchronized pre-round countdown for every phone (one-off). */
   Countdown = "countdown",
+  /** Host wiping every score for the event — in-memory board + persisted rows. */
+  ClearScores = "clear_scores",
 }
 
 /** Available realtime transports (selected behind the GameChannel facade). */

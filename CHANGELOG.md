@@ -3,6 +3,10 @@
 ## 2026-08-16
 
 ### Added
+- Host "Game data" card: **Reset game session** (opens a fresh round, scores kept) and **Clear all game data** (erases every score, behind a confirmation dialog) — `components/host/game-data-control.tsx`, copy in `GAME_DATA_CONTROLS`
+- `RealtimeMessage.ClearScores` — host-only (passcode-gated) message that wipes the live board and the persisted rows
+- Score hydration: the hub restores every attendee's persisted total on first use after a restart (`ensureScoresHydrated`), so the live board never disagrees with the roster
+- Empty state on the home leaderboard peek for when nobody has scored yet (`LEADERBOARD_EMPTY`)
 - "See Map" CTA on the home seat tile, routing straight to the Lecture Theatre plan (`components/navigator/schedule-cta.tsx` sibling `status-card` rework)
 - "See Event Schedule" button under the event-journey track — the one route into the full programme (`components/navigator/schedule-cta.tsx`, label centralized as `SCHEDULE_CTA_LABEL`)
 - Seat tile now has an explicit no-seat state: **NA (Approach Reception)**, with the note in red beside the value
@@ -13,6 +17,9 @@
 - `EVENT_TIMEZONE_OFFSET_MINUTES` / `EVENT_TIMEZONE_LABEL` — the event runs on SGT (UTC+8), independent of the device clock
 
 ### Changed
+- **Scores now accumulate across rounds** instead of keeping only the best round: the hub banks each round into a running per-player total on reset, so a session reset no longer costs anyone their points (`upsertBestScore` → `upsertTotalScore`, `GREATEST` kept only as a never-downgrade guard)
+- Home leaderboard peek always reads the real shared board — the sample `Priya N. / Marcus L. / Alex Tan` teaser is gone, since it made the home peek disagree with the host roster
+- Host flow-bar "Reset" is now "Reset session", and its toast says scores are kept
 - Home screen reordered to the client's revised mock: check-in + seat card first, then the event journey, then the "See Event Schedule" CTA, and only then Navi with her speech bubble — Navi's tips and the session-recaps card stay
 - Seat now reads as the bare id (**SEAT J2**) instead of the banquet `Table 9 · Seat 9 / Zone A` wording; the whole tile is no longer a link, the "See Map" button is
 - Navi's own next-action button is suppressed when it would only duplicate the schedule CTA sitting above her, so phases like Opening show her bubble alone
