@@ -13,7 +13,14 @@ import {
   RegistrationStep,
 } from "@/constants/registration";
 import { AvatarMood } from "@/constants/statuses";
-import { completeRegistration, usePlayerIdentity } from "@/utils/player-identity";
+import { VENUE_DETAIL } from "@/constants/seating";
+import { seatLabel } from "@/utils/seats";
+import { AccessDenialReason } from "@/constants/access";
+import {
+  RegistrationError,
+  completeRegistration,
+  usePlayerIdentity,
+} from "@/utils/player-identity";
 import {
   buildLearningGoals,
   hasAnyGoal,
@@ -39,8 +46,7 @@ export function WelcomeGate() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { seat } = identity;
-  const seatValue = [seat.table, seat.seat].filter(Boolean).join(" · ");
+  const seatValue = seatLabel(identity.seat);
   const firstName = name.trim().split(/\s+/)[0];
 
   const canContinue = name.trim().length > 0 && isValidEmail(email);
@@ -60,8 +66,15 @@ export function WelcomeGate() {
     setError(null);
     try {
       await completeRegistration({ name, email, goals });
-    } catch {
-      setError("Couldn't reach the event server — please try again.");
+    } catch (cause) {
+      // The server's own message (e.g. "not on the guest list") is the useful
+      // one; fall back to a connection error when there isn't one.
+      const message = cause instanceof Error ? cause.message : "";
+      setError(message || "Couldn't reach the event server — please try again.");
+      // A guest-list refusal is about the email, so take them back to it.
+      if (cause instanceof RegistrationError && cause.reason === AccessDenialReason.NotOnList) {
+        setStep(RegistrationStep.Details);
+      }
       setSubmitting(false);
     }
   }
@@ -113,19 +126,19 @@ export function WelcomeGate() {
 
       {step === RegistrationStep.Details ? (
         <>
-          {/* Auto-allocated seat */}
+          {/* The seat waiting for them — designated on the attendance list, so
+              it only resolves once the server has matched their email. */}
           <Card className="mt-4 w-full max-w-sm flex-row items-center gap-3 rounded-2xl border-border/60 p-3 text-left shadow-soft">
             <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-blue/10 text-brand-blue">
               <Armchair className="size-5" />
             </div>
             <div className="min-w-0 leading-tight">
               <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                Your seat · auto-allocated
+                Your seat · {VENUE_DETAIL}
               </p>
-              <p className="text-sm font-semibold">{seatValue}</p>
-              {seat.zone ? (
-                <p className="text-xs text-muted-foreground">{seat.zone}</p>
-              ) : null}
+              <p className="text-sm font-semibold">
+                {seatValue || "Reserved — I'll show you once you're registered"}
+              </p>
             </div>
             <Sparkles className="ml-auto size-4 shrink-0 text-brand-purple" />
           </Card>
@@ -159,6 +172,11 @@ export function WelcomeGate() {
               placeholder="Your corporate email"
               className={cn(inputClass, "mt-2.5")}
             />
+            {error ? (
+              <p role="alert" className="mt-2.5 text-sm font-medium text-destructive">
+                {error}
+              </p>
+            ) : null}
             <Button
               type="submit"
               size="lg"

@@ -60,7 +60,12 @@ export interface RosterEntry {
   /** Staff / Supervisor / HOD / Guest, editable in the host console. */
   role: AttendeeRole;
   /** ISO timestamps (JSON-serialized). */
-  registeredAt: string;
+  addedAt: string;
+  /**
+   * When they registered in the app — null means they're on the attendance
+   * list but have never signed in (the host's "Not yet registered" view).
+   */
+  registeredAt: string | null;
   checkedInAt: string | null;
   /** Best virus-game score across the event (null = hasn't played yet). */
   score: number | null;

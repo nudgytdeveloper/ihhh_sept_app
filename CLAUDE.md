@@ -907,10 +907,66 @@ on one source of truth — **plan geometry**, never per-attendee copy.
 - **Host** — `/host/roster` is the attendance list: per-row seat picker + role
   tag (Staff / Supervisor / HOD / Guest), click-a-seat-on-the-plan assignment for
   the selected attendee, "Load IHH list" (the 12 names in
-  `src/constants/attendance.ts`), CSV import **and** export, duplicate-seat
-  warning. Writes go to `PATCH /api/roster/[id]` and `POST /api/roster/import`,
-  both **host-passcode protected**; `GET /api/roster/[id]` is open (an attendee
-  reading their own record by UUID).
+  `src/constants/attendance.ts`), **`.xlsx` / CSV upload** and CSV export,
+  duplicate-seat warning, and the **status filter** (Everyone / Registered / Not
+  yet registered). Writes go to `PATCH /api/roster/[id]` and
+  `POST /api/roster/import`, both **host-passcode protected**;
+  `GET /api/roster/[id]` is open (an attendee reading their own record by UUID).
+
+## Guest list, Excel upload & the "not yet registered" view — built
+
+Three client asks that all hang off the same list:
+
+- **The attendance list is the guest list.** `/api/register` refuses an email
+  that isn't on it (403 + `AccessDenialReason.NotOnList`); the welcome gate shows
+  the server's message and sends the attendee back to the email step to fix it.
+  Policy lives in `src/server/access.ts` (`isEmailAllowed`) with the copy in
+  `src/constants/access.ts`. Two deliberate escape hatches: the server-only
+  **`DEV_ADMIN_EMAILS`** allowlist (comma-separated) always gets in, and an
+  **empty** list leaves registration open so a fresh deploy isn't locked out
+  before the host has imported anything.
+- **Excel upload.** The host picker takes `.xlsx` as well as CSV
+  (`src/utils/attendance-file.ts`, `"use client"`); `read-excel-file` is
+  **dynamically imported** so it never lands in the attendee bundle. Both formats
+  feed the same `parseAttendanceTable`, which matches columns **by header name**
+  (`ATTENDANCE_COLUMN_ALIASES` — IHH's "Seat Number", any column order) and falls
+  back to positional `Name, Email, Seat, Role` only for a headerless file.
+  Re-uploading **upserts by email and never deletes**: matched rows take the new
+  seat/role and keep their id, check-in stamp, score and registration; anyone
+  absent from the file is untouched.
+- **Who hasn't registered.** `attendees.registered_at` is stamped only by
+  `registerAttendee` — an import leaves it null, which is what separates "on the
+  list" from "has signed in" (`created_at` can't, since an import creates the row
+  too). The roster gains status filter chips with live counts, a per-row badge, a
+  "Not registered" stat card and a `Status` column in the CSV export
+  (`RosterFilter` in `src/constants/roster.ts`, `isRegistered`/`countByFilter` in
+  `src/utils/roster.ts`).
+
+Verified against a production build + real local Postgres: **42/42** — 16 API
+checks (imports read as not-registered, unlisted email 403s with a reason and
+creates no row, a listed email registers into its designated seat, re-import
+keeps the registration stamp while moving seat/role and deletes nobody,
+`DEV_ADMIN_EMAILS` bypass, import still 401s without the passcode); 18 in-browser
+on `/host/roster` with a **real generated `.xlsx`** (header-name matching incl.
+"Seat Number" and a reordered Email-first sheet, lowercase `b1` → `B1`, role
+label → enum, blank seat imports unplaced, an invalid seat is reported not
+imported, blank trailing rows ignored, both filter views correct, no 430px
+overflow, no console errors); and 8 on the welcome gate (refusal message shown,
+attendee not let in, returned to the email step, a listed email gets in with seat
+B1). **Deploy note:** run `npm run db:push` to add `registered_at`, then backfill
+the attendees who registered before this shipped, or they'll all read "Not
+registered":
+
+```sql
+UPDATE attendees SET registered_at = created_at
+WHERE registered_at IS NULL
+  AND (checked_in_at IS NOT NULL
+       OR jsonb_array_length(COALESCE(goals->'selected', '[]'::jsonb)) > 0
+       OR COALESCE(goals->>'custom', '') <> '');
+```
+
+Set `DEV_ADMIN_EMAILS` on Render too, or you'll be locked out alongside everyone
+who isn't on the client's list.
 
 Verified against a production build + real local Postgres: import (12 rows), a
 listed email registering into its designated seat (H2, case/whitespace

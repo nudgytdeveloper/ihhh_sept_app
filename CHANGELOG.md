@@ -3,6 +3,13 @@
 ## 2026-08-16
 
 ### Added
+- **Guest list**: only emails on the uploaded attendance list can register — `/api/register` answers 403 with an explanation the welcome gate shows, and returns the attendee to the email step to correct it (`src/server/access.ts`, `src/constants/access.ts`)
+- `DEV_ADMIN_EMAILS` env var — comma-separated developer/admin addresses that always get in, so the app stays demo-able without editing the client's list
+- **Excel (.xlsx) upload** of the attendance list beside CSV, parsed in the browser via a dynamically-imported `read-excel-file` so it never reaches the attendee bundle (`src/utils/attendance-file.ts`)
+- Attendance import now matches columns **by header name** — IHH's "Seat Number" column, and any column order, import correctly; positional `Name, Email, Seat, Role` remains the fallback for a headerless file (`ATTENDANCE_COLUMN_ALIASES`, `resolveAttendanceColumns`)
+- **"Not yet registered" view** on the host roster (F18): status filter chips (Everyone / Registered / Not yet registered) with live counts, a per-row status badge, and a "Not registered" stat card — who the registration desk still has to chase
+- `attendees.registered_at` — distinguishes "imported from the attendance list" from "has actually signed in"; `created_at` can't, because an import creates the row too
+- `Status` column in the attendance CSV export
 - Host "Game data" card: **Reset game session** (opens a fresh round, scores kept) and **Clear all game data** (erases every score, behind a confirmation dialog) — `components/host/game-data-control.tsx`, copy in `GAME_DATA_CONTROLS`
 - `RealtimeMessage.ClearScores` — host-only (passcode-gated) message that wipes the live board and the persisted rows
 - Score hydration: the hub restores every attendee's persisted total on first use after a restart (`ensureScoresHydrated`), so the live board never disagrees with the roster
@@ -17,6 +24,9 @@
 - `EVENT_TIMEZONE_OFFSET_MINUTES` / `EVENT_TIMEZONE_LABEL` — the event runs on SGT (UTC+8), independent of the device clock
 
 ### Changed
+- Re-uploading the attendance list **upserts by email and never deletes**: matched attendees take the new seat/role while keeping their id, check-in stamp, score and registration; anyone absent from the file is left untouched
+- Roster "Import CSV" is now "Upload list" and accepts `.xlsx` or `.csv`; the roster stat row gained Registered / Not registered and reads "On the list" for the total
+- Welcome-gate seat card no longer shows the legacy banquet `Table · Seat` wording — it reads the Lecture Theatre seat, and says the seat is reserved until the server has matched the email
 - **Scores now accumulate across rounds** instead of keeping only the best round: the hub banks each round into a running per-player total on reset, so a session reset no longer costs anyone their points (`upsertBestScore` → `upsertTotalScore`, `GREATEST` kept only as a never-downgrade guard)
 - Home leaderboard peek always reads the real shared board — the sample `Priya N. / Marcus L. / Alex Tan` teaser is gone, since it made the home peek disagree with the host roster
 - Host flow-bar "Reset" is now "Reset session", and its toast says scores are kept
@@ -32,6 +42,9 @@
 - Home reminders and the host's one-tap reminder presets follow the revised schedule (be seated 11:55, group photo, food collection) instead of the old buffet/keynote copy
 - Host phase tabs relabelled to the 8 new phases; the panel now reads "Phase n of 8"
 - Navi's venue copy corrected for the Lecture Theatre (Cert Table, Reception, seat map) — no more "Desk 3" or "Level 2 coffee bar"
+
+### Fixed
+- Missing space in the roster header ("Lecture Theatreseats") — a JSX interpolation was swallowing the following space
 
 ### Removed
 - `MOCK_SCHEDULE` and `MOCK_ATTENDEE` from `src/data/event.ts` — the schedule is built from `PHASE_META` with the attendee's real seat

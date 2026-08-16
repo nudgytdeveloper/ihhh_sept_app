@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { AccessDenialReason } from "@/constants/access";
 import {
   ONBOARDED_FLAG,
   PLAYER_NAME_ADJECTIVES,
@@ -49,6 +50,21 @@ export interface RegistrationDetails {
   name: string;
   email: string;
   goals: LearningGoals;
+}
+
+/**
+ * A registration the server refused, carrying its reason so the gate can react
+ * (a guest-list refusal sends the attendee back to fix their email, a network
+ * blip just lets them retry).
+ */
+export class RegistrationError extends Error {
+  constructor(
+    message: string,
+    readonly reason: AccessDenialReason | null = null,
+  ) {
+    super(message);
+    this.name = "RegistrationError";
+  }
 }
 
 function readStored(key: string): string | null {
@@ -225,7 +241,16 @@ export async function completeRegistration(details: RegistrationDetails): Promis
     }),
   });
   if (!response.ok) {
-    throw new Error(`Registration failed (${response.status})`);
+    // The server explains a refusal (e.g. not on the guest list) — show that
+    // rather than a generic "something went wrong".
+    const payload = (await response.json().catch(() => null)) as {
+      error?: string;
+      reason?: AccessDenialReason;
+    } | null;
+    throw new RegistrationError(
+      payload?.error || `Registration failed (${response.status})`,
+      payload?.reason ?? null,
+    );
   }
   const { attendee } = (await response.json()) as { attendee: RegisteredAttendee };
 

@@ -1,4 +1,8 @@
-import { ROSTER_CSV_HEADERS } from "@/constants/roster";
+import {
+  ROSTER_CSV_HEADERS,
+  ROSTER_STATUS_LABEL,
+  RosterFilter,
+} from "@/constants/roster";
 import { buildCsv } from "@/utils/csv";
 import { roleLabel } from "@/utils/attendance";
 import { seatLabel } from "@/utils/seats";
@@ -27,21 +31,52 @@ export function formatRosterTime(iso: string | null): string {
   return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
-/** Case-insensitive name / email / seat filter for the roster search box. */
-export function filterRoster(entries: RosterEntry[], query: string): RosterEntry[] {
+/**
+ * Has this person actually signed into the app? False means they're on the
+ * uploaded attendance list but have never registered — the list the
+ * registration desk works through.
+ */
+export function isRegistered(entry: RosterEntry): boolean {
+  return entry.registeredAt !== null;
+}
+
+/** Matches the roster status filter chips. */
+function matchesFilter(entry: RosterEntry, filter: RosterFilter): boolean {
+  switch (filter) {
+    case RosterFilter.Registered:
+      return isRegistered(entry);
+    case RosterFilter.NotRegistered:
+      return !isRegistered(entry);
+    case RosterFilter.All:
+      return true;
+  }
+}
+
+/** Roster search box (name / email / seat) combined with the status filter. */
+export function filterRoster(
+  entries: RosterEntry[],
+  query: string,
+  filter: RosterFilter = RosterFilter.All,
+): RosterEntry[] {
   const needle = query.trim().toLowerCase();
-  if (!needle) return entries;
-  return entries.filter(
-    (entry) =>
+  return entries.filter((entry) => {
+    if (!matchesFilter(entry, filter)) return false;
+    if (!needle) return true;
+    return (
       entry.name.toLowerCase().includes(needle) ||
       entry.email.toLowerCase().includes(needle) ||
-      (entry.seat?.seatId ?? "").toLowerCase() === needle,
-  );
+      (entry.seat?.seatId ?? "").toLowerCase() === needle
+    );
+  });
 }
 
 /** Headline counts for the roster stat row. */
 export interface RosterSummary {
+  /** Everyone on the attendance list, registered or not. */
+  onList: number;
   registered: number;
+  /** On the list but hasn't signed into the app yet. */
+  notRegistered: number;
   checkedIn: number;
   online: number;
   /** Attendees who have a Lecture Theatre seat tagged to them. */
@@ -49,12 +84,20 @@ export interface RosterSummary {
 }
 
 export function summarizeRoster(entries: RosterEntry[]): RosterSummary {
+  const registered = entries.filter(isRegistered).length;
   return {
-    registered: entries.length,
+    onList: entries.length,
+    registered,
+    notRegistered: entries.length - registered,
     checkedIn: entries.filter((entry) => entry.checkedInAt !== null).length,
     online: entries.filter((entry) => entry.online).length,
     seated: entries.filter((entry) => Boolean(entry.seat?.seatId)).length,
   };
+}
+
+/** Count of each status filter, for the chip badges. */
+export function countByFilter(entries: RosterEntry[], filter: RosterFilter): number {
+  return entries.filter((entry) => matchesFilter(entry, filter)).length;
 }
 
 /**
@@ -69,6 +112,9 @@ export function rosterToCsv(entries: RosterEntry[]): string {
       entry.email,
       entry.seat?.seatId ?? "",
       roleLabel(entry.role),
+      isRegistered(entry)
+        ? ROSTER_STATUS_LABEL.registered
+        : ROSTER_STATUS_LABEL.notRegistered,
       formatGoalsLabel(entry.goals),
       entry.registeredAt,
       entry.checkedInAt,

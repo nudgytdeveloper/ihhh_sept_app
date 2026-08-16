@@ -20,6 +20,7 @@ export * from "./registration";
 export * from "./csv";
 export * from "./seats";
 export * from "./attendance";
+export * from "./attendance-file";
 export * from "./roster";
 export * from "./sessions";
 export * from "./use-session-recorder";

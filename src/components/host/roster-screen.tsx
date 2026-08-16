@@ -5,6 +5,7 @@ import {
   Armchair,
   CircleCheck,
   ClipboardList,
+  Clock,
   Database,
   Download,
   ListPlus,
@@ -13,6 +14,7 @@ import {
   TriangleAlert,
   Upload,
   UserCheck,
+  UserRoundX,
   Users,
   Wifi,
 } from "lucide-react";
@@ -30,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LectureTheatreMap, MapLegend } from "@/components/seating/lecture-theatre-map";
 import {
+  ATTENDANCE_FILE_ACCEPT,
   ATTENDANCE_IMPORT_API_PATH,
   PRELOADED_ATTENDEES,
 } from "@/constants/attendance";
@@ -37,7 +40,11 @@ import { HOST_TOKEN_HEADER } from "@/constants/host-auth";
 import {
   ROSTER_API_PATH,
   ROSTER_CSV_FILENAME,
+  ROSTER_FILTER_LABEL,
+  ROSTER_FILTER_ORDER,
   ROSTER_REFRESH_MS,
+  ROSTER_STATUS_LABEL,
+  RosterFilter,
 } from "@/constants/roster";
 import {
   ATTENDEE_ROLE_ORDER,
@@ -47,14 +54,17 @@ import {
 } from "@/constants/seating";
 import { formatScore, getInitials } from "@/utils/format";
 import { downloadCsv } from "@/utils/csv";
-import { duplicateSeatIds, parseAttendanceCsv, roleLabel } from "@/utils/attendance";
+import { duplicateSeatIds, roleLabel } from "@/utils/attendance";
+import { parseAttendanceFile } from "@/utils/attendance-file";
 import { getStoredHostToken } from "@/utils/host-auth";
 import { SEATS_BY_ROW } from "@/utils/seats";
 import {
+  countByFilter,
   filterRoster,
   formatGoalsLabel,
   formatRosterTime,
   formatSeatLabel,
+  isRegistered,
   rosterToCsv,
   summarizeRoster,
 } from "@/utils/roster";
@@ -77,6 +87,7 @@ export function RosterScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<RosterFilter>(RosterFilter.All);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -104,7 +115,7 @@ export function RosterScreen() {
   }, [load]);
 
   const roster = useMemo(() => response?.roster ?? [], [response]);
-  const visible = filterRoster(roster, query);
+  const visible = filterRoster(roster, query, filter);
   const summary = summarizeRoster(roster);
   const loading = response === null && !failed;
 
@@ -181,9 +192,10 @@ export function RosterScreen() {
     [load],
   );
 
-  const onCsvPicked = useCallback(
+  /** Host picked an attendance file — CSV or the .xlsx IHH sends. */
+  const onFilePicked = useCallback(
     async (file: File) => {
-      const { rows, errors } = parseAttendanceCsv(await file.text());
+      const { rows, errors } = await parseAttendanceFile(file);
       if (errors.length > 0) {
         toast.warning(`${errors.length} row(s) skipped — ${errors.slice(0, 2).join("; ")}`);
       }
@@ -198,7 +210,8 @@ export function RosterScreen() {
         <div>
           <h1 className="text-xl font-bold">Attendee roster</h1>
           <p className="text-sm text-muted-foreground">
-            Attendance, {VENUE_DETAIL} seats, and best game scores — in one list.
+            Upload the list (.xlsx or .csv), assign {VENUE_DETAIL}{" "}
+            seats, and see who&apos;s registered, checked in and playing.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -230,7 +243,7 @@ export function RosterScreen() {
             disabled={busy}
           >
             <Upload className="size-4" />
-            Import CSV
+            Upload list
           </Button>
           <Button
             size="sm"
@@ -243,20 +256,26 @@ export function RosterScreen() {
           <input
             ref={fileInput}
             type="file"
-            accept=".csv,text/csv"
+            accept={ATTENDANCE_FILE_ACCEPT}
             className="hidden"
             onChange={(event) => {
               const file = event.target.files?.[0];
               event.target.value = "";
-              if (file) void onCsvPicked(file);
+              if (file) void onFilePicked(file);
             }}
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard icon={Users} label="On the list" value={summary.registered} />
-        <StatCard icon={UserCheck} label="Checked in" value={summary.checkedIn} />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <StatCard icon={Users} label="On the list" value={summary.onList} />
+        <StatCard icon={UserCheck} label="Registered" value={summary.registered} />
+        <StatCard
+          icon={UserRoundX}
+          label="Not registered"
+          value={summary.notRegistered}
+          tone={summary.notRegistered > 0 ? "warning" : "default"}
+        />
         <StatCard icon={Wifi} label="Online now" value={summary.online} live />
         <StatCard icon={Armchair} label="Seats assigned" value={summary.seated} />
       </div>
@@ -278,8 +297,9 @@ export function RosterScreen() {
             All attendees
           </CardTitle>
           <CardDescription>
-            Check-in stamps automatically the first time an attendee opens the
-            event app. Change a seat or role here and their phone follows.
+            This list is also the guest list — only these emails can register.
+            Check-in stamps automatically the first time someone opens the app,
+            and a seat or role changed here follows to their phone.
           </CardDescription>
           <div className="relative mt-2">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -290,6 +310,35 @@ export function RosterScreen() {
               placeholder="Search name, email or seat…"
               className="h-9 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30"
             />
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {ROSTER_FILTER_ORDER.map((option) => {
+              const active = option === filter;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setFilter(option)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition",
+                    active
+                      ? "border-transparent bg-brand-blue text-white"
+                      : "border-border/70 text-muted-foreground hover:border-brand-blue/40 hover:text-brand-blue",
+                  )}
+                >
+                  {ROSTER_FILTER_LABEL[option]}
+                  <span
+                    className={cn(
+                      "font-mono tabular-nums",
+                      active ? "text-white/80" : "text-muted-foreground/70",
+                    )}
+                  >
+                    {countByFilter(roster, option)}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </CardHeader>
         <CardContent className="min-w-0">
@@ -316,21 +365,34 @@ export function RosterScreen() {
             />
           ) : null}
           {response?.available && roster.length > 0 && visible.length === 0 ? (
-            <EmptyState
-              icon={Search}
-              title="No matches"
-              detail={`Nobody matches "${query.trim()}".`}
-            />
+            filter === RosterFilter.NotRegistered && !query.trim() ? (
+              <EmptyState
+                icon={CircleCheck}
+                title="Everyone has registered"
+                detail="Every person on the attendance list has signed into the app."
+              />
+            ) : (
+              <EmptyState
+                icon={Search}
+                title="No matches"
+                detail={
+                  query.trim()
+                    ? `Nobody matches "${query.trim()}".`
+                    : `Nobody is ${ROSTER_FILTER_LABEL[filter].toLowerCase()} yet.`
+                }
+              />
+            )
           ) : null}
 
           {visible.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[52rem] text-sm">
+              <table className="w-full min-w-[58rem] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="px-2 py-2 font-medium">Attendee</th>
                     <th className="px-2 py-2 font-medium">Seat</th>
                     <th className="px-2 py-2 font-medium">Role</th>
+                    <th className="px-2 py-2 font-medium">Status</th>
                     <th className="px-2 py-2 font-medium">Learning goals</th>
                     <th className="px-2 py-2 font-medium">Attendance</th>
                     <th className="px-2 py-2 text-right font-medium">Best score</th>
@@ -419,6 +481,7 @@ function RosterRow({
 }) {
   const goals = formatGoalsLabel(entry.goals);
   const seatId = entry.seat?.seatId ?? "";
+  const registered = isRegistered(entry);
 
   return (
     <tr
@@ -500,6 +563,20 @@ function RosterRow({
         </select>
       </td>
 
+      <td className="whitespace-nowrap px-2 py-2.5">
+        {registered ? (
+          <Badge variant="outline" className="gap-1 border-brand-blue/40 text-brand-blue">
+            <CircleCheck className="size-3" />
+            {ROSTER_STATUS_LABEL.registered}
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="gap-1 border-warning/50 text-warning-foreground">
+            <Clock className="size-3" />
+            {ROSTER_STATUS_LABEL.notRegistered}
+          </Badge>
+        )}
+      </td>
+
       <td className="max-w-[14rem] px-2 py-2.5">
         <p className="truncate text-xs text-muted-foreground" title={goals}>
           {goals || "—"}
@@ -531,16 +608,26 @@ function StatCard({
   label,
   value,
   live = false,
+  tone = "default",
 }: {
   icon: typeof Users;
   label: string;
   value: number;
   live?: boolean;
+  /** "warning" draws the eye to a count the host still has to act on. */
+  tone?: "default" | "warning";
 }) {
   return (
     <Card className="gap-1 py-4">
       <CardContent className="flex items-center gap-3 px-4">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-blue/10 text-brand-blue">
+        <div
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-lg",
+            tone === "warning"
+              ? "bg-warning/15 text-warning-foreground"
+              : "bg-brand-blue/10 text-brand-blue",
+          )}
+        >
           <Icon className="size-4.5" />
         </div>
         <div className="leading-tight">

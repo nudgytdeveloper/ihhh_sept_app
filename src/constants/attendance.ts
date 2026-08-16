@@ -88,9 +88,36 @@ export const PRELOADED_ATTENDEES: readonly AttendanceImportRow[] = [
   },
 ] as const;
 
-/** Column order accepted by the attendance CSV import (a header row is optional). */
+/** Column order accepted by the attendance import when there's no header row. */
 export const ATTENDANCE_IMPORT_HEADERS = ["Name", "Email", "Seat", "Role"] as const;
+
+/**
+ * Header names recognised for each column, lowercased. IHH's spreadsheet calls
+ * the seat column "Seat Number", so the importer matches columns **by header
+ * name** and only falls back to the fixed order above when a file has no
+ * recognisable header row. Add an alias here rather than asking the client to
+ * rename their columns.
+ */
+export const ATTENDANCE_COLUMN_ALIASES = {
+  name: ["name", "full name", "attendee", "attendee name", "staff name"],
+  email: ["email", "email address", "e-mail", "corporate email", "work email"],
+  seat: ["seat", "seat number", "seat no", "seat no.", "seat id", "seat #"],
+  role: ["role", "designation", "type", "attendee type"],
+} as const;
+
+/** Which column an attendance file supplies in each position. */
+export type AttendanceColumn = keyof typeof ATTENDANCE_COLUMN_ALIASES;
 
 /** Import path + the largest list the host console will accept in one go. */
 export const ATTENDANCE_IMPORT_API_PATH = "/api/roster/import";
 export const ATTENDANCE_IMPORT_MAX_ROWS = 500;
+
+/** File types the host console's attendance picker accepts. */
+export const ATTENDANCE_XLSX_EXTENSION = ".xlsx";
+export const ATTENDANCE_CSV_EXTENSION = ".csv";
+export const ATTENDANCE_FILE_ACCEPT = [
+  ATTENDANCE_CSV_EXTENSION,
+  ATTENDANCE_XLSX_EXTENSION,
+  "text/csv",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+].join(",");

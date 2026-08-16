@@ -21,8 +21,38 @@ export const ROSTER_CSV_HEADERS = [
   "Email",
   "Seat",
   "Role",
+  "Status",
   "Learning goals",
   "Registered at",
   "Checked in at",
   "Best score",
 ] as const;
+
+/**
+ * Which slice of the attendance list the host is looking at. "Not registered"
+ * is the one IHH asked for: everyone on the uploaded list who hasn't opened the
+ * app yet, so the registration desk knows who to chase.
+ */
+export enum RosterFilter {
+  All = "all",
+  Registered = "registered",
+  NotRegistered = "not_registered",
+}
+
+export const ROSTER_FILTER_ORDER: readonly RosterFilter[] = [
+  RosterFilter.All,
+  RosterFilter.Registered,
+  RosterFilter.NotRegistered,
+] as const;
+
+export const ROSTER_FILTER_LABEL: Record<RosterFilter, string> = {
+  [RosterFilter.All]: "Everyone",
+  [RosterFilter.Registered]: "Registered",
+  [RosterFilter.NotRegistered]: "Not yet registered",
+};
+
+/** Status wording used in the table badge and the CSV export. */
+export const ROSTER_STATUS_LABEL = {
+  registered: "Registered",
+  notRegistered: "Not registered",
+} as const;

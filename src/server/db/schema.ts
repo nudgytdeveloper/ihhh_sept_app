@@ -44,7 +44,15 @@ export const attendees = pgTable(
     seat: jsonb("seat").$type<SeatInfo>(),
     /** Learning goals picked/typed at registration — feeds the AI session summaries. */
     goals: jsonb("goals").$type<LearningGoals>().notNull(),
+    /** When the row appeared — an attendance-list import, or a self-registration. */
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * When this person actually registered in the app. Null = imported from the
+     * attendance list but never opened it, which is what the host's "Not yet
+     * registered" view is built on. `createdAt` can't answer that on its own,
+     * because an import creates the row too.
+     */
+    registeredAt: timestamp("registered_at", { withTimezone: true }),
     /** First live connection at the event (null = registered but not yet attended). */
     checkedInAt: timestamp("checked_in_at", { withTimezone: true }),
   },

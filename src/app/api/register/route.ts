@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/server/db";
+import { isEmailAllowed } from "@/server/access";
 import { registerAttendee } from "@/server/db/attendees";
+import { ACCESS_COPY, AccessDenialReason } from "@/constants/access";
 import { checkRateLimit, getClientId, rateLimitResponse } from "@/server/rate-limit";
 import { REGISTRATION_LIMITS } from "@/constants/registration";
 import { RateLimitBucket } from "@/constants/rate-limit";
@@ -22,9 +24,14 @@ export const dynamic = "force-dynamic";
  * keeps the Lecture Theatre seat IHH designated for it, and anyone else is
  * auto-allocated the next free seat (see `registerAttendee`).
  *
+ * Access is **guest-list only**: the email has to be on the attendance list IHH
+ * uploaded (or on the `DEV_ADMIN_EMAILS` allowlist), otherwise this answers 403
+ * and the welcome gate explains why. See `src/server/access.ts`.
+ *
  * With no `DATABASE_URL` configured the registration is still accepted and
  * echoed back unpersisted (`persisted: false`) so local dev without Postgres
- * keeps working — same graceful-fallback philosophy as `/api/voice`.
+ * keeps working — same graceful-fallback philosophy as `/api/voice`. There is
+ * no list to check against in that mode, so the guest list can't apply either.
  */
 export async function POST(request: Request) {
   const limit = checkRateLimit(RateLimitBucket.Register, getClientId(request));
@@ -72,6 +79,15 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Guest list: only people on the uploaded attendance list (plus the
+    // developer/admin allowlist) may enter the event app.
+    if (!(await isEmailAllowed(db, email))) {
+      return NextResponse.json(
+        { error: ACCESS_COPY.notOnList, reason: AccessDenialReason.NotOnList },
+        { status: 403 },
+      );
+    }
+
     const row = await registerAttendee(db, { playerId, email, name, goals });
     const attendee: RegisteredAttendee = {
       id: row.id,

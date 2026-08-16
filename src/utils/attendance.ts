@@ -4,7 +4,11 @@ import {
   AttendeeRole,
   DEFAULT_ATTENDEE_ROLE,
 } from "@/constants/seating";
-import { ATTENDANCE_IMPORT_MAX_ROWS } from "@/constants/attendance";
+import {
+  ATTENDANCE_COLUMN_ALIASES,
+  ATTENDANCE_IMPORT_MAX_ROWS,
+  type AttendanceColumn,
+} from "@/constants/attendance";
 import { parseCsv } from "@/utils/csv";
 import { isAssignableSeatId, normalizeSeatId } from "@/utils/seats";
 import { isValidEmail, normalizeEmail } from "@/utils/registration";
@@ -55,23 +59,76 @@ export interface AttendanceParseResult {
 }
 
 /**
- * Parse an attendance CSV: `Name, Email, Seat, Role` — a header row is
- * optional, and Seat/Role may be blank (unplaced attendee, defaulting to
- * Staff). Invalid rows are reported rather than silently dropped.
+ * Which position each column sits in, read from the file's header row.
+ * `null` when the file has no recognisable header — the caller then falls back
+ * to the fixed `ATTENDANCE_IMPORT_HEADERS` order.
+ */
+export type AttendanceColumnMap = Record<AttendanceColumn, number>;
+
+const COLUMN_ORDER: readonly AttendanceColumn[] = ["name", "email", "seat", "role"];
+
+/**
+ * Match a header row to columns by name, so a spreadsheet can label its seat
+ * column "Seat Number" (as IHH's does) or order the columns however it likes.
+ * Returns null unless both required columns (name + email) were found.
+ */
+export function resolveAttendanceColumns(cells: readonly string[]): AttendanceColumnMap | null {
+  const map: AttendanceColumnMap = { name: -1, email: -1, seat: -1, role: -1 };
+  cells.forEach((cell, index) => {
+    const header = cell.trim().toLowerCase();
+    if (!header) return;
+    for (const column of COLUMN_ORDER) {
+      const aliases: readonly string[] = ATTENDANCE_COLUMN_ALIASES[column];
+      if (map[column] === -1 && aliases.includes(header)) map[column] = index;
+    }
+  });
+  return map.name === -1 || map.email === -1 ? null : map;
+}
+
+/** Positional fallback for a file that ships no header row. */
+const POSITIONAL_COLUMNS: AttendanceColumnMap = { name: 0, email: 1, seat: 2, role: 3 };
+
+/**
+ * Parse an attendance CSV: `Name, Email, Seat, Role`. See
+ * `parseAttendanceTable` for the rules — this just splits the text first.
  */
 export function parseAttendanceCsv(text: string): AttendanceParseResult {
-  const table = parseCsv(text);
+  return parseAttendanceTable(parseCsv(text));
+}
+
+/**
+ * Parse an already-split attendance table (CSV rows or Excel cells).
+ *
+ * Columns are matched by header name when the first row is a recognisable
+ * header, otherwise by the fixed `Name, Email, Seat, Role` order. Seat and Role
+ * may be blank (an unplaced attendee, defaulting to Staff). Invalid rows are
+ * reported rather than silently dropped, so the host sees what didn't make it.
+ */
+export function parseAttendanceTable(table: readonly string[][]): AttendanceParseResult {
   const rows: AttendanceImportRow[] = [];
   const errors: string[] = [];
   const seenEmails = new Set<string>();
 
-  for (const [index, cells] of table.entries()) {
-    const [rawName = "", rawEmail = "", rawSeat = "", rawRole = ""] = cells.map((cell) =>
-      cell.trim(),
-    );
+  const header = table[0] ? resolveAttendanceColumns(table[0]) : null;
+  const columns = header ?? POSITIONAL_COLUMNS;
 
-    // Skip a header row (detected, not assumed by position).
-    if (index === 0 && rawEmail.toLowerCase() === "email") continue;
+  for (const [index, cells] of table.entries()) {
+    // Skip the header row (detected, not assumed by position).
+    if (index === 0 && header) continue;
+
+    const cellAt = (column: AttendanceColumn) => {
+      const position = columns[column];
+      return position === -1 ? "" : (cells[position] ?? "").trim();
+    };
+    const rawName = cellAt("name");
+    const rawEmail = cellAt("email");
+    const rawSeat = cellAt("seat");
+    const rawRole = cellAt("role");
+
+    // A headerless file still shouldn't import its own header row.
+    if (index === 0 && !header && rawEmail.toLowerCase() === "email") continue;
+    // Trailing blank rows are common in spreadsheets — ignore, don't report.
+    if (!rawName && !rawEmail) continue;
 
     const line = index + 1;
     const name = rawName;

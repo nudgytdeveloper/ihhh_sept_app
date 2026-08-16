@@ -58,7 +58,13 @@ export async function registerAttendee(
   if (existing) {
     const [updated] = await db
       .update(attendees)
-      .set({ name: input.name, goals: input.goals })
+      // `registeredAt` is only stamped the first time — it's what separates
+      // "imported from the attendance list" from "has actually signed in".
+      .set({
+        name: input.name,
+        goals: input.goals,
+        registeredAt: existing.registeredAt ?? sql`now()`,
+      })
       .where(eq(attendees.id, existing.id))
       .returning();
     // On the list but never placed (imported without a seat) — allocate now.
@@ -75,6 +81,7 @@ export async function registerAttendee(
       goals: input.goals,
       seatId,
       role: DEFAULT_ATTENDEE_ROLE,
+      registeredAt: sql`now()`,
     };
     try {
       const [row] = await db
@@ -104,6 +111,7 @@ export async function registerAttendee(
       name: input.name,
       goals: input.goals,
       role: DEFAULT_ATTENDEE_ROLE,
+      registeredAt: sql`now()`,
     })
     .returning();
   return row;
@@ -256,6 +264,26 @@ export async function markCheckedIn(db: Db, playerId: string): Promise<void> {
   }
 }
 
+/**
+ * Is this email on the attendance list? The list is the access allowlist: only
+ * people IHH imported (or who registered back when the list was still empty)
+ * may enter the app. See `src/server/access.ts` for the policy around it.
+ */
+export async function isOnAttendanceList(db: Db, email: string): Promise<boolean> {
+  const [row] = await db
+    .select({ email: attendees.email })
+    .from(attendees)
+    .where(eq(attendees.email, email))
+    .limit(1);
+  return Boolean(row);
+}
+
+/** How many people are on the attendance list right now. */
+export async function countAttendees(db: Db): Promise<number> {
+  const [row] = await db.select({ total: sql<number>`count(*)::int` }).from(attendees);
+  return row?.total ?? 0;
+}
+
 /** One attendee by id (device/player id = row id), or null. */
 export async function getAttendeeById(db: Db, id: string): Promise<AttendeeRow | null> {
   if (!UUID_PATTERN.test(id)) return null;
@@ -273,7 +301,10 @@ export interface RosterRecord {
   /** @deprecated legacy banquet seat, for rows predating the seat map. */
   legacySeat: SeatInfo | null;
   goals: LearningGoals;
-  registeredAt: Date;
+  /** When the row appeared (attendance-list import or self-registration). */
+  addedAt: Date;
+  /** When they registered in the app — null = on the list but never signed in. */
+  registeredAt: Date | null;
   checkedInAt: Date | null;
   score: number | null;
 }
@@ -292,7 +323,8 @@ export async function listRoster(db: Db): Promise<RosterRecord[]> {
       role: attendees.role,
       legacySeat: attendees.seat,
       goals: attendees.goals,
-      registeredAt: attendees.createdAt,
+      addedAt: attendees.createdAt,
+      registeredAt: attendees.registeredAt,
       checkedInAt: attendees.checkedInAt,
       score: gameScores.score,
     })

@@ -14,6 +14,7 @@ export * from "./player";
 export * from "./registration";
 export * from "./roster";
 export * from "./attendance";
+export * from "./access";
 export * from "./sessions";
 export * from "./summaries";
 export * from "./push";
