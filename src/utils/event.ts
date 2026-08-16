@@ -103,3 +103,14 @@ export function getScheduledPhase(now: Date = new Date()): EventPhase {
   }
   return current;
 }
+
+/**
+ * The next phase the programme clock will move to, or null once the last one has
+ * started. Drives the host's "auto-advances to X at 12:05 PM" line, so the copy
+ * always comes from the same schedule the clock reads.
+ */
+export function getNextScheduledPhase(now: Date = new Date()): PhaseMeta | null {
+  const minutes = getSingaporeMinutes(now);
+  const next = PHASE_ORDER.find((phase) => PHASE_META[phase].startMinutes > minutes);
+  return next ? PHASE_META[next] : null;
+}

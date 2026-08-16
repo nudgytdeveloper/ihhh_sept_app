@@ -1,10 +1,11 @@
 import {
   clearAllScores,
+  ensurePhaseClock,
   ensureScoresHydrated,
   publishCountdown,
-  publishPhase,
   publishReminder,
   publishState,
+  setPhaseControl,
   submitScore,
 } from "@/server/game-hub";
 import { getDb } from "@/server/db";
@@ -13,7 +14,7 @@ import { sendPhasePush, sendReminderPush } from "@/server/push/send";
 import { isValidHostToken } from "@/server/host-auth";
 import { RealtimeMessage } from "@/constants/realtime";
 import { HOST_ONLY_MESSAGE_TYPES, HOST_TOKEN_HEADER } from "@/constants/host-auth";
-import type { EventPhase } from "@/constants/phases";
+import { PHASE_ORDER, PhaseControlMode, type EventPhase } from "@/constants/phases";
 import type { ScoreEntry } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
   // A score posted right after a restart must add to the persisted total, not
   // start a fresh one from zero.
   await ensureScoresHydrated();
+  ensurePhaseClock();
 
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") {
@@ -58,10 +60,19 @@ export async function POST(request: Request) {
   } else if (body.type === RealtimeMessage.ClearScores) {
     clearAllScores();
     void purgeScores();
-  } else if (body.type === RealtimeMessage.Phase && typeof body.phase === "string") {
-    publishPhase(body.phase);
-    // "What's next" phone notification for every attendee — fire-and-forget.
-    void sendPhasePush(body.phase as EventPhase).catch(() => {});
+  } else if (body.type === RealtimeMessage.Phase) {
+    // The host either pins a phase (Manual) or hands the journey back to the
+    // programme clock (Auto — the server resolves which phase that is).
+    const mode =
+      body.mode === PhaseControlMode.Auto ? PhaseControlMode.Auto : PhaseControlMode.Manual;
+    const phase = PHASE_ORDER.includes(body.phase) ? (body.phase as EventPhase) : undefined;
+    if (mode === PhaseControlMode.Manual && !phase) {
+      return Response.json({ ok: false, error: "invalid phase" }, { status: 400 });
+    }
+    const moved = setPhaseControl(mode, phase);
+    // "What's next" phone notification for every attendee — fire-and-forget, and
+    // only when the journey actually moved (a mode flip alone isn't news).
+    if (moved) void sendPhasePush(moved).catch(() => {});
   } else if (body.type === RealtimeMessage.Countdown && typeof body.seconds === "number") {
     publishCountdown(body.seconds);
   } else {

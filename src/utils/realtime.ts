@@ -8,7 +8,8 @@ import {
 } from "@/constants/realtime";
 import { HOST_TOKEN_HEADER } from "@/constants/host-auth";
 import { getStoredHostToken } from "@/utils/host-auth";
-import type { EventPhase } from "@/constants/phases";
+import { getScheduledPhase } from "@/utils/event";
+import { PhaseControlMode, type EventPhase } from "@/constants/phases";
 import type { GameSessionState, ScoreEntry } from "@/types";
 
 /** A message exchanged over the realtime game channel. */
@@ -18,7 +19,7 @@ export type RealtimeChannelMessage =
   | { type: RealtimeMessage.RequestState }
   | { type: RealtimeMessage.Score; entry: ScoreEntry }
   | { type: RealtimeMessage.Leaderboard; entries: ScoreEntry[] }
-  | { type: RealtimeMessage.Phase; phase: EventPhase }
+  | { type: RealtimeMessage.Phase; phase: EventPhase; mode: PhaseControlMode }
   | { type: RealtimeMessage.Presence; count: number }
   | { type: RealtimeMessage.Countdown; seconds: number };
 
@@ -34,7 +35,8 @@ interface Transport {
   publishState(state: GameSessionState): void;
   publishReminder(reminderId: string): void;
   publishScore(entry: ScoreEntry): void;
-  publishPhase(phase: EventPhase): void;
+  /** Auto hands the journey back to the programme clock; `phase` is then ignored. */
+  publishPhase(mode: PhaseControlMode, phase?: EventPhase): void;
   publishCountdown(seconds: number): void;
   clearScores(): void;
   requestState(): void;
@@ -66,8 +68,14 @@ class BroadcastTransport implements Transport {
     // No server to aggregate in same-browser mode; relayed for completeness.
     this.channel?.postMessage({ type: RealtimeMessage.Score, entry });
   }
-  publishPhase(phase: EventPhase): void {
-    this.channel?.postMessage({ type: RealtimeMessage.Phase, phase });
+  publishPhase(mode: PhaseControlMode, phase?: EventPhase): void {
+    // No server to resolve the clock in same-browser mode, so do it here — every
+    // listener still receives a concrete phase.
+    this.channel?.postMessage({
+      type: RealtimeMessage.Phase,
+      phase: mode === PhaseControlMode.Auto ? getScheduledPhase() : phase,
+      mode,
+    });
   }
   publishCountdown(seconds: number): void {
     this.channel?.postMessage({ type: RealtimeMessage.Countdown, seconds });
@@ -112,8 +120,8 @@ class SseTransport implements Transport {
       });
     });
     source.addEventListener(RealtimeMessage.Phase, (event) => {
-      const { phase } = JSON.parse((event as MessageEvent).data);
-      this.emit({ type: RealtimeMessage.Phase, phase });
+      const { phase, mode } = JSON.parse((event as MessageEvent).data);
+      this.emit({ type: RealtimeMessage.Phase, phase, mode });
     });
     source.addEventListener(RealtimeMessage.Presence, (event) => {
       const { count } = JSON.parse((event as MessageEvent).data);
@@ -154,8 +162,8 @@ class SseTransport implements Transport {
   publishScore(entry: ScoreEntry): void {
     this.post({ type: RealtimeMessage.Score, entry });
   }
-  publishPhase(phase: EventPhase): void {
-    this.post({ type: RealtimeMessage.Phase, phase });
+  publishPhase(mode: PhaseControlMode, phase?: EventPhase): void {
+    this.post({ type: RealtimeMessage.Phase, mode, phase });
   }
   publishCountdown(seconds: number): void {
     this.post({ type: RealtimeMessage.Countdown, seconds });
@@ -222,8 +230,9 @@ export class GameChannel {
   publishScore(entry: ScoreEntry): void {
     this.transport.publishScore(entry);
   }
-  publishPhase(phase: EventPhase): void {
-    this.transport.publishPhase(phase);
+  /** Pin a phase (Manual) or hand the journey back to the programme clock (Auto). */
+  publishPhase(mode: PhaseControlMode, phase?: EventPhase): void {
+    this.transport.publishPhase(mode, phase);
   }
   publishCountdown(seconds: number): void {
     this.transport.publishCountdown(seconds);

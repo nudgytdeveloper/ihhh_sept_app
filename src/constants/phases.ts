@@ -220,6 +220,50 @@ export const PHASE_META: Record<EventPhase, PhaseMeta> = {
 };
 
 /**
+ * Who decides the current event phase.
+ *
+ * Auto is the default: the journey follows the programme clock in Singapore time,
+ * so the event runs itself even with nobody at the control room. The moment the
+ * host picks a phase the mode flips to Manual and that override *sticks* — the
+ * clock never yanks the room back mid-speech — until the host hands control back.
+ */
+export enum PhaseControlMode {
+  Auto = "auto",
+  Manual = "manual",
+}
+
+export interface PhaseControlMeta {
+  /** Badge label on the host's journey card. */
+  label: string;
+  /** One-line explanation of what's driving the journey right now. */
+  description: string;
+  /** Soft badge classes (kept literal so Tailwind detects them). */
+  chip: string;
+}
+
+export const PHASE_CONTROL_META: Record<PhaseControlMode, PhaseControlMeta> = {
+  [PhaseControlMode.Auto]: {
+    label: "Auto · on the clock",
+    description: "The journey follows the programme times on its own.",
+    chip: "bg-teal-500/15 text-teal-700",
+  },
+  [PhaseControlMode.Manual]: {
+    label: "Host override",
+    description: "You're driving — the programme clock won't move the journey.",
+    chip: "bg-amber-500/15 text-amber-700",
+  },
+};
+
+/** How the server drives clock-based advancement. */
+export const PHASE_CLOCK = {
+  /**
+   * How often the server re-checks the programme clock. Phases are minutes apart,
+   * so a coarse tick is plenty — and it costs one comparison when nothing moved.
+   */
+  tickMs: 15_000,
+} as const;
+
+/**
  * Progress state of a phase relative to the current one — drives the schedule
  * timeline's node/card styling and status label. Derive it with
  * `getPhaseState()` from `@/utils/event` rather than comparing indices ad-hoc.

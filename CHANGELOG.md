@@ -3,6 +3,13 @@
 ## 2026-08-16
 
 ### Added
+- **Clock-driven event journey (F16)**: the journey now advances itself on the Singapore programme clock, so the event runs with nobody at the control room — a new attendee also lands on the right phase the moment they open the app
+- **Host override that sticks**: picking any phase in the control room takes over (`PhaseControlMode.Manual`) and the clock stops moving the room until the host presses **Follow the clock** to hand it back
+- Host journey card shows what's driving the event — an "Auto · on the clock" / "Host override" badge, the next scheduled phase and its time, and the hand-back button
+- Host activity log records a clock-driven advance, taking manual control, and handing the journey back
+- `PhaseControlMode` + `PHASE_CONTROL_META` + `PHASE_CLOCK` in `src/constants/phases.ts`; `getNextScheduledPhase()` in `src/utils/event.ts`
+- Server-authoritative phase resolution in the realtime hub (`getPhaseSnapshot`, `setPhaseControl`, `ensurePhaseClock`) — one answer for every phone, the host screen and any late joiner
+- A clock-driven advance fires the same "what's next" phone push as a host-driven one
 - **Guest list**: only emails on the uploaded attendance list can register — `/api/register` answers 403 with an explanation the welcome gate shows, and returns the attendee to the email step to correct it (`src/server/access.ts`, `src/constants/access.ts`)
 - `DEV_ADMIN_EMAILS` env var — comma-separated developer/admin addresses that always get in, so the app stays demo-able without editing the client's list
 - **Excel (.xlsx) upload** of the attendance list beside CSV, parsed in the browser via a dynamically-imported `read-excel-file` so it never reaches the attendee bundle (`src/utils/attendance-file.ts`)
@@ -24,6 +31,8 @@
 - `EVENT_TIMEZONE_OFFSET_MINUTES` / `EVENT_TIMEZONE_LABEL` — the event runs on SGT (UTC+8), independent of the device clock
 
 ### Changed
+- The realtime `phase` message now carries `{phase, mode}`, and the host publishes a mode rather than a bare phase (`publishPhase(mode, phase?)`); `/api/game/publish` rejects a phase that isn't in the programme
+- Host phase toast uses the unassigned wording where a phase has one, so it no longer shows a raw `{seat}` token
 - Re-uploading the attendance list **upserts by email and never deletes**: matched attendees take the new seat/role while keeping their id, check-in stamp, score and registration; anyone absent from the file is left untouched
 - Roster "Import CSV" is now "Upload list" and accepts `.xlsx` or `.csv`; the roster stat row gained Registered / Not registered and reads "On the list" for the total
 - Welcome-gate seat card no longer shows the legacy banquet `Table · Seat` wording — it reads the Lecture Theatre seat, and says the seat is reserved until the server has matched the email

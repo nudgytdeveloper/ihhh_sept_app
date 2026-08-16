@@ -1,9 +1,10 @@
 import {
   addSubscriber,
+  ensurePhaseClock,
   ensureScoresHydrated,
-  getCurrentPhase,
   getCurrentState,
   getLeaderboard,
+  getPhaseSnapshot,
   getPresenceCount,
 } from "@/server/game-hub";
 import { getDb } from "@/server/db";
@@ -23,6 +24,9 @@ export async function GET(request: Request) {
   // Restore persisted totals before replaying the board, so a client that
   // connects right after a restart sees real scores rather than an empty board.
   await ensureScoresHydrated();
+  // The programme clock advances the journey on its own — make sure it's ticking
+  // in the instance that's actually serving connections.
+  ensurePhaseClock();
 
   const playerId = new URL(request.url).searchParams.get("playerId") ?? undefined;
   // Attendance: a registered attendee's first live connection is the check-in.
@@ -45,8 +49,9 @@ export async function GET(request: Request) {
       };
 
       // Sync the newly-connected client with the current phase + session + board.
-      const phase = getCurrentPhase();
-      if (phase) send(RealtimeMessage.Phase, { phase });
+      // The phase is always known (the clock resolves one), so an attendee who
+      // opens the app mid-event lands on the right phase with no host action.
+      send(RealtimeMessage.Phase, getPhaseSnapshot());
       const current = getCurrentState();
       if (current) send(RealtimeMessage.State, current);
       const board = getLeaderboard();

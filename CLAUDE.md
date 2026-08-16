@@ -462,14 +462,34 @@ import it from client code / the barrels.** Schema changes apply with
 `createdb ihhh_dev` + `DATABASE_URL=postgres://localhost:5432/ihhh_dev`;
 production: a Render Postgres instance (Internal URL on the web service).
 
-**Host-driven live event journey.** The current `EventPhase` is now shared live
-state over SSE (same hub as the game), defaulting to **phase 1 (Registered)**.
-The Host Control Panel has an **Event Journey** control
-(`src/components/host/event-journey-control.tsx` — advance to next / jump to any
-phase) that broadcasts the phase; every attendee's Navi message, journey track,
-and schedule update live. Plumbing: `RealtimeMessage.Phase`, hub
-`publishPhase`/`getCurrentPhase` (replayed on connect), `GameChannel.publishPhase`
-/ `useGameChannel({ onPhase })`. The attendee area subscribes **once** in
+**Live event journey — clock-driven, host-overridable.** The current `EventPhase`
+is shared live state over SSE (same hub as the game), and the **server resolves
+it**, so every phone, the host screen and any late joiner get one answer:
+
+- **Auto (default)** — the journey follows the **Singapore programme clock**
+  (`getScheduledPhase()` over `PhaseMeta.startMinutes`). The event runs itself
+  with nobody at the control room, and an attendee who opens the app mid-event
+  lands on the right phase without a host action. A server ticker
+  (`ensurePhaseClock`, `PHASE_CLOCK.tickMs`) only *broadcasts* the change — the
+  phase itself is always re-derived, so a restart can't lose it. A clock advance
+  fires the same "what's next" phone push as a host advance.
+- **Manual** — the moment the host picks a phase in the **Event Journey** control
+  (`src/components/host/event-journey-control.tsx`) the override **sticks**: the
+  clock stops moving the room (no advancing mid-speech) until the host presses
+  **Follow the clock**, which hands it back and re-resolves from the schedule.
+  The card shows which mode is live, the next scheduled phase + time, and logs
+  clock advances / takeovers / hand-backs in the host activity feed.
+
+Plumbing: `PhaseControlMode` + `PHASE_CONTROL_META` + `PHASE_CLOCK` in
+`constants/phases.ts`; hub `getPhaseSnapshot` / `setPhaseControl` /
+`ensurePhaseClock` (snapshot replayed on connect, and the clock is started from
+*both* realtime routes for the same module-instance reason as
+`ensureScoresHydrated`); `RealtimeMessage.Phase` now carries `{phase, mode}`;
+`GameChannel.publishPhase(mode, phase?)` / `useGameChannel({ onPhase })`.
+`/api/game/publish` rejects a phase that isn't in `PHASE_ORDER`. Same-browser
+`broadcast` transport has no server clock, so Auto there resolves client-side —
+like presence and the shared board, the clock is an SSE-mode feature.
+The attendee area subscribes **once** in
 `src/components/navigator/attendee-shell.tsx` (`AttendeeShell` — owns the phase +
 reminder + leaderboard subscription, provides phase via `useEventPhase()` and the
 shared board via `useLiveLeaderboard()`, and renders the onboarding gate); it

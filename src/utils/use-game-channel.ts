@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { RealtimeMessage } from "@/constants/realtime";
 import { GameChannel } from "@/utils/realtime";
-import type { EventPhase } from "@/constants/phases";
+import { PhaseControlMode, type EventPhase } from "@/constants/phases";
 import type { GameSessionState, ScoreEntry } from "@/types";
 
 export interface GameChannelHandlers {
@@ -13,8 +13,11 @@ export interface GameChannelHandlers {
   onReminder?: (reminderId: string) => void;
   /** The aggregated shared leaderboard changed (from the server). */
   onLeaderboard?: (entries: ScoreEntry[]) => void;
-  /** The host advanced the event journey phase. */
-  onPhase?: (phase: EventPhase) => void;
+  /**
+   * The event journey phase changed — advanced by the host, or by the programme
+   * clock. `mode` says which is driving it (the attendee screens ignore it).
+   */
+  onPhase?: (phase: EventPhase, mode: PhaseControlMode) => void;
   /** The live count of connected attendees changed (from the server). */
   onPresence?: (count: number) => void;
   /** The host fired a synchronized pre-round countdown for every phone. */
@@ -65,7 +68,7 @@ export function useGameChannel(handlers: GameChannelHandlers = {}) {
       } else if (message.type === RealtimeMessage.Leaderboard) {
         current.onLeaderboard?.(message.entries);
       } else if (message.type === RealtimeMessage.Phase) {
-        current.onPhase?.(message.phase);
+        current.onPhase?.(message.phase, message.mode);
       } else if (message.type === RealtimeMessage.Presence) {
         current.onPresence?.(message.count);
       } else if (message.type === RealtimeMessage.Countdown) {
@@ -98,8 +101,8 @@ export function useGameChannel(handlers: GameChannelHandlers = {}) {
     channelRef.current?.publishScore(entry);
   }, []);
 
-  const publishPhase = useCallback((phase: EventPhase) => {
-    channelRef.current?.publishPhase(phase);
+  const publishPhase = useCallback((mode: PhaseControlMode, phase?: EventPhase) => {
+    channelRef.current?.publishPhase(mode, phase);
   }, []);
 
   const clearScores = useCallback(() => {

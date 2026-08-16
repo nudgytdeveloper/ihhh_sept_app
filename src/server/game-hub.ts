@@ -1,6 +1,7 @@
 import { GameStatus, GAME_CONFIG } from "@/constants/game";
 import { RealtimeMessage } from "@/constants/realtime";
-import type { EventPhase } from "@/constants/phases";
+import { PHASE_CLOCK, PhaseControlMode, type EventPhase } from "@/constants/phases";
+import { getScheduledPhase } from "@/utils/event";
 import type { GameSessionState, ScoreEntry } from "@/types";
 
 /**
@@ -19,8 +20,6 @@ type SseSend = (event: string, data: unknown) => void;
 
 const subscribers = new Set<SseSend>();
 let currentState: GameSessionState | null = null;
-/** The latest event journey phase the host has set, replayed on connect. */
-let currentPhase: EventPhase | null = null;
 /**
  * Scores accumulate across rounds: a player's board total is their banked total
  * from finished rounds plus whatever they've scored in the round running now.
@@ -87,9 +86,95 @@ export function getCurrentState(): GameSessionState | null {
   return currentState;
 }
 
-/** The latest event journey phase, replayed to each newly-connected client. */
-export function getCurrentPhase(): EventPhase | null {
-  return currentPhase;
+/* ------------------------- Event journey (the clock) ----------------------- */
+
+/**
+ * The journey runs itself off the programme clock (Auto) until the host takes
+ * over, and the override then sticks until they hand control back. Resolved
+ * server-side so every phone, the host screen and a late joiner all agree — the
+ * clock is never re-derived per device.
+ */
+let phaseMode: PhaseControlMode = PhaseControlMode.Auto;
+/** The phase the host pinned, only consulted while the mode is Manual. */
+let manualPhase: EventPhase | null = null;
+/** Last phase actually fanned out — so a tick only broadcasts on a real change. */
+let lastPhase: EventPhase | null = null;
+let clockTimer: ReturnType<typeof setInterval> | null = null;
+
+/** The phase in force right now: the host's pin, else whatever the clock says. */
+function resolvePhase(): EventPhase {
+  return phaseMode === PhaseControlMode.Manual && manualPhase
+    ? manualPhase
+    : getScheduledPhase();
+}
+
+/** The current phase + what's driving it, replayed to each new client. */
+export function getPhaseSnapshot(): { phase: EventPhase; mode: PhaseControlMode } {
+  return { phase: resolvePhase(), mode: phaseMode };
+}
+
+/**
+ * Fan the phase out. Returns the phase when it actually *moved* (so the caller
+ * fires the "what's next" push exactly once), null when nothing changed. `force`
+ * re-announces even a same-phase update, which is how a mode flip reaches every
+ * screen without pretending the journey advanced.
+ */
+function applyPhase(next: EventPhase, force = false): EventPhase | null {
+  const moved = next !== lastPhase;
+  if (!moved && !force) return null;
+  lastPhase = next;
+  broadcast(RealtimeMessage.Phase, { phase: next, mode: phaseMode });
+  return moved ? next : null;
+}
+
+/**
+ * Host either pinned a phase (Manual) or handed the journey back to the clock
+ * (Auto, where `phase` is ignored — the server resolves it). Returns the new
+ * phase when it moved, so the route can push it to phones.
+ */
+export function setPhaseControl(
+  mode: PhaseControlMode,
+  phase?: EventPhase,
+): EventPhase | null {
+  phaseMode = mode;
+  if (mode === PhaseControlMode.Manual && phase) manualPhase = phase;
+  return applyPhase(resolvePhase(), true);
+}
+
+/**
+ * Start the programme clock (idempotent). Lazily started from the realtime routes
+ * rather than `instrumentation.ts` for the same reason as `ensureScoresHydrated`:
+ * that hook runs in its own module instance, so a ticker started there would be
+ * advancing a *different* copy of this module than the one serving traffic.
+ */
+export function ensurePhaseClock(): void {
+  if (clockTimer) return;
+  lastPhase ??= resolvePhase();
+  clockTimer = setInterval(tickPhaseClock, PHASE_CLOCK.tickMs);
+  // Never hold the process open just to tick the schedule.
+  (clockTimer as { unref?: () => void }).unref?.();
+}
+
+function tickPhaseClock(): void {
+  if (phaseMode !== PhaseControlMode.Auto) return;
+  const moved = applyPhase(getScheduledPhase());
+  if (!moved) return;
+  console.log(`[phase] programme clock advanced the journey to ${moved}`);
+  void pushPhaseToPhones(moved);
+}
+
+/**
+ * "What's next" phone notification for a clock-driven advance — the same nudge
+ * the host's manual advance sends, so an unattended journey feels identical.
+ * Imported lazily to keep the push/VAPID stack out of this module's graph.
+ */
+async function pushPhaseToPhones(phase: EventPhase): Promise<void> {
+  try {
+    const { sendPhasePush } = await import("@/server/push/send");
+    await sendPhasePush(phase);
+  } catch (error) {
+    console.error("[phase] auto-advance push failed", error);
+  }
 }
 
 /** A player's event total: everything banked plus the round running now. */
@@ -221,12 +306,6 @@ export function clearAllScores(): void {
 /** Device playerIds currently connected — the roster's "online now" dots. */
 export function getOnlinePlayerIds(): string[] {
   return [...presence.keys()];
-}
-
-/** Host advanced the event journey → store it + fan out to everyone. */
-export function publishPhase(phase: EventPhase): void {
-  currentPhase = phase;
-  broadcast(RealtimeMessage.Phase, { phase });
 }
 
 /** Host pushed a one-off reminder → fan out (not stored). */

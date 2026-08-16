@@ -1,4 +1,7 @@
-import { Route, ArrowRight, Check } from "lucide-react";
+"use client";
+
+import { useEffect, useState } from "react";
+import { Route, ArrowRight, Check, Clock, Hand } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -16,27 +19,62 @@ import {
   EventPhase,
   PHASE_ORDER,
   PHASE_META,
+  PHASE_CONTROL_META,
+  PHASE_CLOCK,
+  PhaseControlMode,
   PhaseProgressState,
+  type PhaseMeta,
 } from "@/constants/phases";
-import { getAvatarScript, getNextPhase, getPhaseIndex, getPhaseState } from "@/utils/event";
+import {
+  getAvatarScript,
+  getNextPhase,
+  getNextScheduledPhase,
+  getPhaseIndex,
+  getPhaseState,
+} from "@/utils/event";
 
 /**
- * Host control for the event journey. Picking a phase (or advancing to the next)
- * drives Navi for every attendee live — the home hero, journey track, and
- * schedule all react to the broadcast phase. Independent of the game round.
+ * Host control for the event journey. The journey advances itself off the
+ * programme clock (Auto); picking a phase here takes over (Manual) and that
+ * override sticks until the host hands control back — so the clock can't move
+ * the room mid-speech. Either way it drives Navi for every attendee live.
  */
+/**
+ * The phase the programme clock will move to next, re-read on the same cadence
+ * the server ticks. Resolved after mount (never during render), because the
+ * answer depends on the current time — server HTML would otherwise disagree
+ * with the client at hydration.
+ */
+function useUpcomingScheduledPhase(): PhaseMeta | null {
+  const [upcoming, setUpcoming] = useState<PhaseMeta | null>(null);
+  useEffect(() => {
+    const read = () => setUpcoming(getNextScheduledPhase());
+    read();
+    const timer = window.setInterval(read, PHASE_CLOCK.tickMs);
+    return () => window.clearInterval(timer);
+  }, []);
+  return upcoming;
+}
+
 export function EventJourneyControl({
   phase,
+  mode,
   onSelectPhase,
+  onFollowClock,
 }: {
   phase: EventPhase;
+  mode: PhaseControlMode;
   onSelectPhase: (phase: EventPhase) => void;
+  onFollowClock: () => void;
 }) {
   const current = PHASE_META[phase];
   const next = getNextPhase(phase);
   const script = getAvatarScript(phase);
   const step = getPhaseIndex(phase) + 1;
   const total = PHASE_ORDER.length;
+  const control = PHASE_CONTROL_META[mode];
+  const isAuto = mode === PhaseControlMode.Auto;
+  const upcoming = useUpcomingScheduledPhase();
 
   return (
     <Card>
@@ -57,6 +95,32 @@ export function EventJourneyControl({
       </CardHeader>
 
       <CardContent className="space-y-3">
+        {/* Who's driving the journey: the programme clock, or the host */}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 px-3 py-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <span
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold",
+                control.chip,
+              )}
+            >
+              {isAuto ? <Clock className="size-3.5" /> : <Hand className="size-3.5" />}
+              {control.label}
+            </span>
+            <p className="min-w-0 text-xs text-muted-foreground">
+              {isAuto && upcoming
+                ? `Moves to ${upcoming.label} at ${upcoming.time}, on its own.`
+                : control.description}
+            </p>
+          </div>
+          {!isAuto ? (
+            <Button size="sm" variant="outline" onClick={onFollowClock}>
+              <Clock className="size-4" />
+              Follow the clock
+            </Button>
+          ) : null}
+        </div>
+
         {/* Phase picker — jump to any phase, current emphasized */}
         <div className="flex flex-wrap gap-2">
           {PHASE_ORDER.map((p) => {

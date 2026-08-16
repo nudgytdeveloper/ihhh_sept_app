@@ -31,7 +31,12 @@ import {
   GAME_NAME,
   BOSS_NAME,
 } from "@/constants/game";
-import { EventPhase, PHASE_ORDER, PHASE_META } from "@/constants/phases";
+import {
+  EventPhase,
+  PHASE_ORDER,
+  PHASE_META,
+  PhaseControlMode,
+} from "@/constants/phases";
 import {
   LogTone,
   HOST_REMINDERS,
@@ -59,7 +64,10 @@ export function HostControlPanel() {
   const [playerCount, setPlayerCount] = useState(0);
 
   const [status, setStatus] = useState<GameStatus>(MOCK_EVENT_STATE.game.status);
+  // Phase + who's driving it. Both are server-resolved: the snapshot replayed on
+  // connect corrects these before the host touches anything.
   const [phase, setPhase] = useState<EventPhase>(PHASE_ORDER[0]);
+  const [phaseMode, setPhaseMode] = useState<PhaseControlMode>(PhaseControlMode.Auto);
   const [selectedShape, setSelectedShape] = useState<BossShape>(BossShape.Circle);
   const [activeBossShape, setActiveBossShape] = useState<BossShape | null>(null);
   const [locked, setLocked] = useState(false);
@@ -83,6 +91,9 @@ export function HostControlPanel() {
   );
 
   const logIdRef = useRef(0);
+  // Live phase mirrors, read from realtime callbacks (never during render).
+  const phaseRef = useRef(phase);
+  const phaseSyncedRef = useRef(false);
   const controls = getHostControls(status);
 
   // The shared live leaderboard, aggregated server-side from every attendee's
@@ -111,7 +122,23 @@ export function HostControlPanel() {
   } = useGameChannel({
     getStateForSync: () => sessionRef.current,
     onLeaderboard: setLiveScores,
-    onPhase: setPhase,
+    onPhase: (next, mode) => {
+      const moved = next !== phaseRef.current;
+      const firstSync = !phaseSyncedRef.current;
+      phaseRef.current = next;
+      phaseSyncedRef.current = true;
+      setPhase(next);
+      setPhaseMode(mode);
+      // The clock moved the room without anyone pressing anything — say so, so a
+      // host is never surprised by a phase they didn't drive. (The replay that
+      // arrives on connect isn't an advance, so it stays out of the log.)
+      if (moved && !firstSync && mode === PhaseControlMode.Auto) {
+        addLog(
+          `Programme clock advanced the event to ${PHASE_META[next].label}`,
+          LogTone.Info,
+        );
+      }
+    },
     onPresence: setPlayerCount,
     onCountdown: startCountdown,
   });
@@ -228,13 +255,40 @@ export function HostControlPanel() {
     addLog("Cleared all game data — every score erased", LogTone.Danger);
   }
 
+  /**
+   * Pin the journey to a phase. This is also how the host takes over from the
+   * programme clock — from here the clock stops moving the room until
+   * `handleFollowClock` hands it back.
+   */
   function handleSelectPhase(next: EventPhase) {
-    if (next === phase) return;
+    const takingOver = phaseMode !== PhaseControlMode.Manual;
+    if (next === phase && !takingOver) return;
+    phaseRef.current = next;
     setPhase(next);
-    publishPhase(next);
+    setPhaseMode(PhaseControlMode.Manual);
+    publishPhase(PhaseControlMode.Manual, next);
     const meta = PHASE_META[next];
-    toast(`Event: ${meta.label}`, { description: meta.description });
-    addLog(`Advanced event to ${meta.label}`, LogTone.Info);
+    // The host has no seat, so use the unassigned wording where a phase has one —
+    // otherwise the toast would show the raw {seat} token.
+    toast(`Event: ${meta.label}`, {
+      description: meta.descriptionUnassigned ?? meta.description,
+    });
+    addLog(
+      takingOver
+        ? `Took manual control — event set to ${meta.label}`
+        : `Advanced event to ${meta.label}`,
+      LogTone.Info,
+    );
+  }
+
+  /** Hand the journey back to the programme clock (the server resolves the phase). */
+  function handleFollowClock() {
+    setPhaseMode(PhaseControlMode.Auto);
+    publishPhase(PhaseControlMode.Auto);
+    toast("Back on the programme clock", {
+      description: "The journey advances itself from here.",
+    });
+    addLog("Handed the journey back to the programme clock", LogTone.Info);
   }
 
   function handlePushReminder(reminder: HostReminder) {
@@ -254,7 +308,12 @@ export function HostControlPanel() {
       <GuidedTour tour={TutorialTour.Host} steps={HOST_TOUR_STEPS} />
 
       <div data-tour={TourAnchor.HostJourney}>
-        <EventJourneyControl phase={phase} onSelectPhase={handleSelectPhase} />
+        <EventJourneyControl
+          phase={phase}
+          mode={phaseMode}
+          onSelectPhase={handleSelectPhase}
+          onFollowClock={handleFollowClock}
+        />
       </div>
 
       <div data-tour={TourAnchor.HostFlow}>
