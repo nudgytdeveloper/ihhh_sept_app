@@ -7,8 +7,16 @@ import { NaviTips } from "@/components/navigator/navi-tips";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ActionIntent } from "@/constants/statuses";
-import { TourAnchor } from "@/constants/tutorial";
-import type { AvatarScript } from "@/constants/avatar-scripts";
+import { ROUTES } from "@/constants/routes";
+import type { AvatarAction, AvatarScript } from "@/constants/avatar-scripts";
+
+/**
+ * The journey block above Navi already owns the route into the schedule, so a
+ * schedule-bound script action would render a second identical button. Drop it
+ * and let Navi carry only a genuinely different next step.
+ */
+const isScheduleAction = (action?: AvatarAction) =>
+  action?.href === ROUTES.SCHEDULE;
 
 /**
  * The hero of the navigator: the interactive avatar host (NaviHost) speaks first
@@ -22,8 +30,10 @@ export function NavigatorHero({
   script: AvatarScript;
   name: string;
 }) {
-  const primary = script.action;
-  const secondary = script.secondaryAction;
+  const primary = isScheduleAction(script.action) ? undefined : script.action;
+  const secondary = isScheduleAction(script.secondaryAction)
+    ? undefined
+    : script.secondaryAction;
 
   return (
     <section className="flex flex-col items-center text-center">
@@ -31,10 +41,7 @@ export function NavigatorHero({
 
       {/* Next action(s) */}
       {primary || secondary ? (
-        <div
-          data-tour={TourAnchor.NextAction}
-          className="mt-5 flex w-full flex-col gap-2.5 sm:flex-row sm:justify-center"
-        >
+        <div className="mt-5 flex w-full flex-col gap-2.5 sm:flex-row sm:justify-center">
           {primary ? (
             <Button
               asChild

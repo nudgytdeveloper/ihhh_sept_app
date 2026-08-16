@@ -157,6 +157,24 @@ function ScheduleRow({
           {item.description}
         </p>
 
+        {item.details?.length ? (
+          <ul
+            className={cn(
+              "mt-1.5 space-y-1 text-sm leading-relaxed",
+              isDone ? "text-muted-foreground/80" : "text-muted-foreground",
+            )}
+          >
+            {item.details.map((detail) => (
+              <li key={detail} className="flex gap-2">
+                <span aria-hidden className="select-none">
+                  -
+                </span>
+                <span className="text-pretty">{detail}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
         <div className="mt-3 flex items-center justify-between gap-3">
           <span
             className={cn(

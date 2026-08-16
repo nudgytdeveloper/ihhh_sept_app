@@ -6,6 +6,10 @@ import {
   type PhaseMeta,
 } from "@/constants/phases";
 import { AVATAR_SCRIPTS, type AvatarScript } from "@/constants/avatar-scripts";
+import { EVENT_TIMEZONE_OFFSET_MINUTES } from "@/constants/app";
+import { SEAT_DISPLAY } from "@/constants/seating";
+import { template } from "@/utils/format";
+import type { ScheduleItem } from "@/types";
 
 /** Display metadata for a phase. */
 export function getPhaseMeta(phase: EventPhase): PhaseMeta {
@@ -54,4 +58,48 @@ export function getPhaseState(
 /** The avatar's scripted line for the given phase. */
 export function getAvatarScript(phase: EventPhase): AvatarScript {
   return AVATAR_SCRIPTS[phase];
+}
+
+/**
+ * The full programme lineup with the attendee's seat resolved into the copy.
+ * Pass the seat id (e.g. "H3"); omit it and the unassigned wording is used so
+ * a walk-in is pointed at Reception instead of reading "seat number is NA".
+ */
+export function buildSchedule(seatId?: string | null): ScheduleItem[] {
+  const seat = seatId?.trim() ?? "";
+  return PHASE_ORDER.map((phase) => {
+    const meta = PHASE_META[phase];
+    const copy =
+      seat === "" && meta.descriptionUnassigned
+        ? meta.descriptionUnassigned
+        : meta.description;
+    return {
+      phase,
+      title: meta.label,
+      time: meta.time,
+      description: template(copy, { seat: seat || SEAT_DISPLAY.unassignedLabel }),
+      details: meta.details,
+    };
+  });
+}
+
+/** Minutes since midnight in Singapore time (UTC+8) for a given instant. */
+export function getSingaporeMinutes(now: Date = new Date()): number {
+  const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  return (utcMinutes + EVENT_TIMEZONE_OFFSET_MINUTES) % (24 * 60);
+}
+
+/**
+ * The phase the programme clock says we should be in — the last phase whose
+ * scheduled start has passed in Singapore time. Before the first phase starts,
+ * the journey sits at phase 1. This is what drives automatic advancement; the
+ * host can always override it from the control room.
+ */
+export function getScheduledPhase(now: Date = new Date()): EventPhase {
+  const minutes = getSingaporeMinutes(now);
+  let current = PHASE_ORDER[0];
+  for (const phase of PHASE_ORDER) {
+    if (PHASE_META[phase].startMinutes <= minutes) current = phase;
+  }
+  return current;
 }

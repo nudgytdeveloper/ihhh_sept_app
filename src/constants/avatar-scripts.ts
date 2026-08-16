@@ -19,6 +19,12 @@ export interface AvatarAction {
   intent: ActionIntent;
 }
 
+/**
+ * The one label for "go to the full programme", used by the home journey CTA
+ * and every schedule-bound avatar action, so the wording never drifts.
+ */
+export const SCHEDULE_CTA_LABEL = "See Event Schedule";
+
 export interface AvatarScript {
   phase: EventPhase;
   /** Short eyebrow line above the speech bubble. */
@@ -40,40 +46,16 @@ export const AVATAR_SCRIPTS: Record<EventPhase, AvatarScript> = {
       "Great to have you here, {name}! You're all checked in. Take a look at today's plan and I'll guide you the rest of the way.",
     mood: AvatarMood.Welcoming,
     action: {
-      label: "See today's plan",
+      label: SCHEDULE_CTA_LABEL,
       href: ROUTES.SCHEDULE,
       intent: ActionIntent.Primary,
-    },
-  },
-  [EventPhase.Seated]: {
-    phase: EventPhase.Seated,
-    greeting: "Your seat is ready",
-    message:
-      "Head on in, {name} — your seat is waiting. Get comfortable, we're starting shortly.",
-    mood: AvatarMood.Guiding,
-    action: {
-      label: "View the schedule",
-      href: ROUTES.SCHEDULE,
-      intent: ActionIntent.Primary,
-    },
-  },
-  [EventPhase.Opening]: {
-    phase: EventPhase.Opening,
-    greeting: "We're about to begin",
-    message:
-      "The opening keynote is starting now. Settle in — and stay close, the Virus Fight game is coming up next!",
-    mood: AvatarMood.Guiding,
-    action: {
-      label: "Open the schedule",
-      href: ROUTES.SCHEDULE,
-      intent: ActionIntent.Secondary,
     },
   },
   [EventPhase.GameSession]: {
     phase: EventPhase.GameSession,
     greeting: "It's game time! 🎮",
     message:
-      "The Virus Fight is about to begin, {name}. Jump into the lobby, grab your spot, and let's climb that leaderboard together!",
+      "The Virus Fight is on, {name}. Jump into the lobby and climb that leaderboard — the top 3 win prizes!",
     mood: AvatarMood.Excited,
     action: {
       label: "Enter the Game Lobby",
@@ -81,32 +63,84 @@ export const AVATAR_SCRIPTS: Record<EventPhase, AvatarScript> = {
       intent: ActionIntent.Primary,
     },
     secondaryAction: {
-      label: "Check the schedule",
+      label: SCHEDULE_CTA_LABEL,
       href: ROUTES.SCHEDULE,
       intent: ActionIntent.Secondary,
     },
   },
-  [EventPhase.Buffet]: {
-    phase: EventPhase.Buffet,
-    greeting: "Buffet is open 🍽️",
+  [EventPhase.StartOfEvent]: {
+    phase: EventPhase.StartOfEvent,
+    greeting: "Please take your seat",
     message:
-      "Nicely played, {name}! Time to relax and refuel — the buffet is open. I'll let you know when we head back to the hall.",
-    mood: AvatarMood.Relaxed,
+      "We're starting, {name} — please be seated. Tap below and I'll show you exactly where to go.",
+    mood: AvatarMood.Guiding,
     action: {
-      label: "See afternoon schedule",
+      label: "Find my seat",
+      href: ROUTES.SEAT,
+      intent: ActionIntent.Primary,
+    },
+    secondaryAction: {
+      label: SCHEDULE_CTA_LABEL,
       href: ROUTES.SCHEDULE,
       intent: ActionIntent.Secondary,
     },
   },
-  [EventPhase.Closing]: {
-    phase: EventPhase.Closing,
-    greeting: "That's a wrap! 🎉",
+  [EventPhase.Opening]: {
+    phase: EventPhase.Opening,
+    greeting: "We're about to begin",
     message:
-      `What a day, {name}! Thanks for being part of ${EVENT_NAME}. Catch the closing highlights before you go.`,
+      "Dr Peter Chow is giving the welcome speech now. Settle in, {name} — the award presentation is right after.",
+    mood: AvatarMood.Guiding,
+    action: {
+      label: SCHEDULE_CTA_LABEL,
+      href: ROUTES.SCHEDULE,
+      intent: ActionIntent.Secondary,
+    },
+  },
+  [EventPhase.AwardPresentation]: {
+    phase: EventPhase.AwardPresentation,
+    greeting: "Award presentation 🎓",
+    message:
+      "Certificates are being presented now. If your name is called, head up to the front — and let's hear that applause!",
     mood: AvatarMood.Celebrating,
     action: {
-      label: "View closing details",
+      label: SCHEDULE_CTA_LABEL,
       href: ROUTES.SCHEDULE,
+      intent: ActionIntent.Secondary,
+    },
+  },
+  [EventPhase.WinnersGroupPhoto]: {
+    phase: EventPhase.WinnersGroupPhoto,
+    greeting: "Winners & group photo 📸",
+    message:
+      "Time to crown our Virus Fight champions! Get seated for the group photo, {name} — everyone in frame.",
+    mood: AvatarMood.Celebrating,
+    action: {
+      label: "See the leaderboard",
+      href: ROUTES.GAME_LOBBY,
+      intent: ActionIntent.Primary,
+    },
+  },
+  [EventPhase.FoodCollection]: {
+    phase: EventPhase.FoodCollection,
+    greeting: "Lunch is ready 🍱",
+    message:
+      "Nicely played, {name}! Collect your lunch just outside the event hall — take your time and refuel.",
+    mood: AvatarMood.Relaxed,
+    action: {
+      label: SCHEDULE_CTA_LABEL,
+      href: ROUTES.SCHEDULE,
+      intent: ActionIntent.Secondary,
+    },
+  },
+  [EventPhase.EndOfEvent]: {
+    phase: EventPhase.EndOfEvent,
+    greeting: "That's a wrap! 🎉",
+    message: `What a day, {name}! Thank you for joining us at ${EVENT_NAME}. Your session recaps are ready before you go.`,
+    mood: AvatarMood.Celebrating,
+    action: {
+      label: "Read my session recaps",
+      href: ROUTES.RECAPS,
       intent: ActionIntent.Primary,
     },
   },
@@ -128,7 +162,7 @@ export const SEAT_INTRO =
 
 /** Shown when the attendee is on the list but hasn't been placed yet. */
 export const SEAT_INTRO_UNASSIGNED =
-  "You're checked in, {name} — we're still setting a seat aside for you. The team at the Cert Table will point you to it.";
+  "You're checked in, {name} — we're still setting a seat aside for you. Approach the Reception and the team will point you to it.";
 
 /**
  * Host's coaching line for the game lobby (Screen 3). Token: `{name}` — render

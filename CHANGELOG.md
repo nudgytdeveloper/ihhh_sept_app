@@ -3,6 +3,35 @@
 ## 2026-08-16
 
 ### Added
+- "See Map" CTA on the home seat tile, routing straight to the Lecture Theatre plan (`components/navigator/schedule-cta.tsx` sibling `status-card` rework)
+- "See Event Schedule" button under the event-journey track — the one route into the full programme (`components/navigator/schedule-cta.tsx`, label centralized as `SCHEDULE_CTA_LABEL`)
+- Seat tile now has an explicit no-seat state: **NA (Approach Reception)**, with the note in red beside the value
+- `SEAT_DISPLAY` in `src/constants/seating.ts` — seat prefix, unassigned label/note and map CTA copy in one place
+- Award Presentation phase renders its three certificates as bullet lines on the schedule timeline (`ScheduleItem.details`)
+- `PhaseMeta.startMinutes` — each phase's scheduled start in Singapore time, plus `getScheduledPhase()` / `getSingaporeMinutes()` in `src/utils/event.ts`, the groundwork for clock-driven phase advancement
+- `buildSchedule(seatId)` resolves the `{seat}` token in schedule copy, with separate wording for an attendee who has no seat yet
+- `EVENT_TIMEZONE_OFFSET_MINUTES` / `EVENT_TIMEZONE_LABEL` — the event runs on SGT (UTC+8), independent of the device clock
+
+### Changed
+- Home screen reordered to the client's revised mock: check-in + seat card first, then the event journey, then the "See Event Schedule" CTA, and only then Navi with her speech bubble — Navi's tips and the session-recaps card stay
+- Seat now reads as the bare id (**SEAT J2**) instead of the banquet `Table 9 · Seat 9 / Zone A` wording; the whole tile is no longer a link, the "See Map" button is
+- Navi's own next-action button is suppressed when it would only duplicate the schedule CTA sitting above her, so phases like Opening show her bubble alone
+- The event-journey card dropped its "Full schedule" header link now that the CTA below owns that route
+- Attendee tour re-ordered to follow the new layout (seat → journey → schedule → Navi → game → recaps → alerts) and gained a seat step — 7 steps, was 6
+- Event journey rebuilt to the client's revised programme lineup: 8 phases (Registered 11:30 · Game Session 11:30 · Start of Event 11:55 · Opening 12:05 · Award Presentation 12:10 · Winners / Group Photo 12:45 · Food Collection 12:50 · End of Event 1:00), replacing the 6 demo phases — Seated/Buffet/Closing are gone and the game now precedes seating
+- Phase icons remapped so each matches its phase (Start of Event → seat, Opening → mic, Awards → award, Photo → camera, Food → cutlery), fixing the wrong gamepad/cutlery icons the client flagged
+- Schedule, timeline copy, Navi's scripted lines, tips and arrival lines rewritten to the real programme — Dr Peter Chow's welcome speech, the three certificates, group photo, lunch collection outside the hall
+- Event name is now **IHH SG Learning Festival 2026** everywhere (was "IHHSG"/"IHHH 2026"), per client feedback
+- Home reminders and the host's one-tap reminder presets follow the revised schedule (be seated 11:55, group photo, food collection) instead of the old buffet/keynote copy
+- Host phase tabs relabelled to the 8 new phases; the panel now reads "Phase n of 8"
+- Navi's venue copy corrected for the Lecture Theatre (Cert Table, Reception, seat map) — no more "Desk 3" or "Level 2 coffee bar"
+
+### Removed
+- `MOCK_SCHEDULE` and `MOCK_ATTENDEE` from `src/data/event.ts` — the schedule is built from `PHASE_META` with the attendee's real seat
+
+## 2026-08-16
+
+### Added
 - Lecture Theatre seat map (Notion task 561): the real Gleneagles Hospital plan — rows A–H centre, J/K side blocks, C5/C6 crossed out, Entrance / Cert Table / Projector / AV Area / Emcee — rendered as SVG from parametric geometry (`src/constants/seating.ts` → `src/utils/seats.ts` → `components/seating/lecture-theatre-map.tsx`)
 - Attendee "Find my seat" screen at `/seat` (reached from the home seat tile): Navi names the seat, the plan zooms to it with a pulsing pin, and walking directions are derived from the plan geometry (`buildSeatDirections`) rather than written per attendee; a toggle switches between the zoom and the whole theatre
 - Pre-loaded attendance list: the 12 names/emails/seats IHH supplied (`src/constants/attendance.ts`), loaded into Postgres from the roster console with "Load IHH list"

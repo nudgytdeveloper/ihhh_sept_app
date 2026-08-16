@@ -99,7 +99,10 @@ export interface ScheduleItem {
   phase: EventPhase;
   title: string;
   time: string;
+  /** Seat tokens already resolved — build with `buildSchedule()` from `@/utils/event`. */
   description: string;
+  /** Optional bullet lines under the description (e.g. the award certificates). */
+  details?: readonly string[];
 }
 
 /** One row on the Virus Fight leaderboard. */

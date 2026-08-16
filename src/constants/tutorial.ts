@@ -48,6 +48,7 @@ export enum TutorialPlacement {
  */
 export enum TourAnchor {
   // Attendee home (Screen 1)
+  Seat = "seat",
   Navi = "navi",
   NextAction = "next-action",
   Journey = "journey",
@@ -73,21 +74,27 @@ export interface TutorialStep {
 /** Attendee walkthrough — plain, casual, non-technical (matches Navi's voice). */
 export const ATTENDEE_TOUR_STEPS: TutorialStep[] = [
   {
-    anchor: TourAnchor.Navi,
-    title: "Meet Navi",
-    body: "This is Navi, your event guide. She greets you by name and always shows the one next thing to do — no menus to dig through.",
-    placement: TutorialPlacement.Bottom,
-  },
-  {
-    anchor: TourAnchor.NextAction,
-    title: "Your next step",
-    body: "Whatever's next — check in, take a seat, join the game — Navi puts it right here. Just tap the button.",
+    anchor: TourAnchor.Seat,
+    title: "Your seat, up front",
+    body: "Your check-in and your seat number live right here. Tap “See Map” and I'll show you exactly where to sit.",
     placement: TutorialPlacement.Bottom,
   },
   {
     anchor: TourAnchor.Journey,
     title: "Where we are in the day",
-    body: "Follow the whole day here: welcome, seating, the game, buffet, and the finish. It moves along as the event does.",
+    body: "Follow the whole day here: check-in, the game, seating, the awards, lunch, and the finish. It moves along as the event does.",
+  },
+  {
+    anchor: TourAnchor.NextAction,
+    title: "The full programme",
+    body: "Every talk, award and break — with times. Tap through any time you want to know what's coming up.",
+    placement: TutorialPlacement.Bottom,
+  },
+  {
+    anchor: TourAnchor.Navi,
+    title: "Meet Navi",
+    body: "This is Navi, your event guide. She greets you by name and always shows the one next thing to do — no menus to dig through.",
+    placement: TutorialPlacement.Bottom,
   },
   {
     anchor: TourAnchor.Game,
@@ -102,7 +109,7 @@ export const ATTENDEE_TOUR_STEPS: TutorialStep[] = [
   {
     anchor: TourAnchor.Notifications,
     title: "Get a heads-up",
-    body: "Turn on phone alerts so you never miss game time, buffet, or the next talk — even with the app closed.",
+    body: "Turn on phone alerts so you never miss game time, the awards, or lunch — even with the app closed.",
     placement: TutorialPlacement.Top,
   },
 ];
@@ -112,7 +119,7 @@ export const HOST_TOUR_STEPS: TutorialStep[] = [
   {
     anchor: TourAnchor.HostJourney,
     title: "Steer the day",
-    body: "Move everyone from welcome, to seated, to buffet with a tap. Every guest's phone updates live.",
+    body: "Move everyone from check-in, to the game, to seated, right through to the finish with a tap. Every guest's phone updates live.",
     placement: TutorialPlacement.Bottom,
   },
   {
@@ -128,7 +135,7 @@ export const HOST_TOUR_STEPS: TutorialStep[] = [
   {
     anchor: TourAnchor.HostReminders,
     title: "Send a nudge",
-    body: "Ping every guest's phone with a reminder in one tap — buffet's open, back to your seats, and more.",
+    body: "Ping every guest's phone with a reminder in one tap — please be seated, lunch is ready, and more.",
   },
   {
     anchor: TourAnchor.HostLeaderboard,

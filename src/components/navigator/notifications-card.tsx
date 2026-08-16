@@ -11,7 +11,7 @@ import { AVATAR_NAME } from "@/constants/app";
 
 /**
  * Home opt-in for phone alerts (Phase 5). Navi offers to ping the attendee for
- * the next thing on the timeline — game time, buffet, their next session — even
+ * the next thing on the timeline — game time, the awards, lunch — even
  * with the app closed. Hidden entirely when push can't work (unsupported device
  * or switched off server-side), so it only appears when it can deliver.
  */
@@ -67,7 +67,7 @@ export function NotificationsCard() {
             ? `${AVATAR_NAME} will ping this phone for what's next — even with the app closed.`
             : isBlocked
               ? "Turn notifications back on for this site in your browser settings."
-              : `Let ${AVATAR_NAME} nudge you when it's game time, buffet, or your next session.`}
+              : `Let ${AVATAR_NAME} nudge you when it's game time, the awards, or lunch.`}
         </p>
       </div>
 

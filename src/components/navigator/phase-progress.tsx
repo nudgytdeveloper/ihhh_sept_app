@@ -1,8 +1,6 @@
-import Link from "next/link";
-import { Check, ChevronRight } from "lucide-react";
+import { Check } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { ROUTES } from "@/constants/routes";
 import { EventPhase, PHASE_ORDER, PHASE_META } from "@/constants/phases";
 import { getPhaseIndex, getNextPhase, getPhaseProgress } from "@/utils/event";
 
@@ -19,16 +17,9 @@ export function PhaseProgress({ phase }: { phase: EventPhase }) {
 
   return (
     <Card className="gap-0 rounded-2xl border-border/60 p-5 shadow-soft">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Your event journey</h2>
-        <Link
-          href={ROUTES.SCHEDULE}
-          className="inline-flex items-center gap-0.5 text-xs font-medium text-brand-blue transition hover:opacity-80"
-        >
-          Full schedule
-          <ChevronRight className="size-3.5" />
-        </Link>
-      </div>
+      {/* The route into the full programme is the ScheduleCta directly below
+          this card, so the header carries no competing link. */}
+      <h2 className="text-sm font-semibold">Your event journey</h2>
 
       {/* Progress track with phase nodes */}
       <div className="relative mt-5 px-1">

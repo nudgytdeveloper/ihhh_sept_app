@@ -58,40 +58,49 @@ export const NAVI_CONFIG = {
  */
 export const NAVI_TIPS: Record<EventPhase, string[]> = {
   [EventPhase.Registered]: [
-    "Grab your badge at the welcome desk — Desk 3 has the shortest line right now. 🎟️",
+    "You're checked in — tap “See Map” and I'll show you exactly where you're sitting. 🗺️",
     "Pro tip: screenshot today's plan so it's always one tap away. 📅",
-    "The coffee bar on Level 2 is fully stocked and queue-free… for now. ☕",
-    "Say hi to someone new near you — the best connections start before the keynote. 🤝",
-    "Keep your phone handy, {name} — I'll nudge you the second your seat's ready. 🔔",
-  ],
-  [EventPhase.Seated]: [
-    "Comfy seat? Drop your bag and take a breath — we begin shortly. 🪑",
-    "Silence your phone (but keep me on!) — the keynote's about to start. 🤫",
-    "Hydration check 💧 — there's water at the end of each row.",
-    "Good seat karma: leave the aisle clear for anyone running late. 😇",
-  ],
-  [EventPhase.Opening]: [
-    "Eyes up front — the opening keynote is the one not to miss. 🎤",
-    "Jot down one idea you want to remember today. Future-you says thanks. ✍️",
-    "Psst… the Virus Fight game is right after this. Limber up those thumbs. 🎮",
-    "Applause is free — be generous with it. 👏",
+    "Certificates are collected at the Cert Table by the entrance. 🎓",
+    "Say hi to someone new near you — the best connections start before we begin. 🤝",
+    "Keep your phone handy, {name} — I'll nudge you when each phase begins. 🔔",
   ],
   [EventPhase.GameSession]: [
     "Tap fast, tap everything — every mini-virus is points. 👾",
     "When the COVID boss appears, draw the shape I call out to blast it. ✏️",
-    "Top 3 get a shoutout from the host — go climb that leaderboard! 🏆",
+    "Top 3 winners receive prizes — go climb that leaderboard! 🏆",
     "No thumbs of steel required, {name} — accuracy beats panic. 😎",
+    "Your score keeps building across rounds, so every game counts. 📈",
   ],
-  [EventPhase.Buffet]: [
-    "The smoothie bar is the hidden gem — thank me later. 🥤",
-    "Beat the rush: the dessert table fills up fast around 12:15. 🍰",
-    "Refuel and recharge — grab a window seat for the view. 🌿",
-    "Compare game scores with your table — friendly bragging encouraged. 😄",
+  [EventPhase.StartOfEvent]: [
+    "Time to take your seat — tap “See Map” if you'd like me to show you the way. 🪑",
+    "Silence your phone (but keep me on!) — we're starting shortly. 🤫",
+    "Not sure where to sit? The Reception team will point you right to it. 🧭",
+    "Good seat karma: leave the aisle clear for anyone running late. 😇",
   ],
-  [EventPhase.Closing]: [
-    "Don't dash off — closing highlights and prizes are worth the stay. 🎉",
+  [EventPhase.Opening]: [
+    "Eyes up front — Dr Peter Chow is giving the welcome speech. 🎤",
+    "Jot down one idea you want to remember today. Future-you says thanks. ✍️",
+    "Applause is free — be generous with it. 👏",
+  ],
+  [EventPhase.AwardPresentation]: [
+    "Award time! Give the recipients a big round of applause. 👏",
+    "Certificates are handed out at the Cert Table by the entrance. 🎓",
+    "If your name is called, head up when the emcee invites you. 🏅",
+  ],
+  [EventPhase.WinnersGroupPhoto]: [
+    "Game winners, this is your moment — congratulations! 🏆",
+    "Get seated for the group photo, {name} — everyone in frame! 📸",
+    "Smile! This one's going in the event recap. 😄",
+  ],
+  [EventPhase.FoodCollection]: [
+    "Lunch is ready — collect it just outside the event hall. 🍱",
+    "Refuel and recharge, {name} — you earned it. 🌿",
+    "Compare game scores while you eat — friendly bragging encouraged. 😄",
+  ],
+  [EventPhase.EndOfEvent]: [
+    "That's a wrap — thank you for joining us today! 🎉",
     "Connect with one new person before you head out. 📇",
-    "Grab a goodie bag near the exit — limited stock! 🎁",
+    "Your session recaps are ready whenever you are. 📝",
     "Safe travels, {name} — today was better because you came. 💙",
   ],
 };
@@ -103,14 +112,14 @@ export const NAVI_TIPS: Record<EventPhase, string[]> = {
 export const NAVI_REACTIONS: string[] = [
   "Hi {name}! 👋 Need a hand?",
   "Boop! ✨",
-  "Psst — the coffee bar on Level 2 has zero queue right now. ☕",
+  "Psst — tap “See Map” and I'll walk you to your seat. 🗺️",
   "I saved you a great seat. 😉",
   "You've got this, {name}. 💪",
   "Fun fact: I never blink first. 👀",
   "Tap me anytime — I'm your event navigator. 🧭",
   "Looking sharp today. 😎",
   "Stick with me and you won't miss a thing. 🌟",
-  "Snack alert: the buffet opens at noon. 🍽️",
+  "Snack alert: lunch collection is at 12:50 PM. 🍱",
   "Want a tip? I've got a hundred of them. 💡",
   "High five! ✋",
   "I'm basically your event GPS. Recalculating… 🛰️",
@@ -123,11 +132,13 @@ export const NAVI_REACTIONS: string[] = [
  */
 export const NAVI_ARRIVAL_LINES: Record<EventPhase, string> = {
   [EventPhase.Registered]: "You're checked in, {name}! Let the day begin. 🎉",
-  [EventPhase.Seated]: "Seats are ready — follow me, {name}! 🎟️",
-  [EventPhase.Opening]: "Here we go — the keynote's starting! 🎤",
   [EventPhase.GameSession]: "It's GAME TIME! Thumbs ready? 🎮",
-  [EventPhase.Buffet]: "Buffet's open — go refuel, you earned it! 🍽️",
-  [EventPhase.Closing]: "What a day, {name}! Let's wrap it up right. 🎉",
+  [EventPhase.StartOfEvent]: "Please take your seat, {name} — we're starting! 🪑",
+  [EventPhase.Opening]: "Here we go — Dr Peter Chow is on! 🎤",
+  [EventPhase.AwardPresentation]: "Award time — let's hear that applause! 👏",
+  [EventPhase.WinnersGroupPhoto]: "Winners up front — say cheese, everyone! 📸",
+  [EventPhase.FoodCollection]: "Lunch is served — collect yours outside the hall! 🍱",
+  [EventPhase.EndOfEvent]: "What a day, {name}! Thanks for joining us. 🎉",
 };
 
 /** Navi's reaction when more attendees join — `{count}` is the live headcount. */

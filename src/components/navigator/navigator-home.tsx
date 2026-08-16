@@ -3,6 +3,7 @@
 import { Reveal } from "@/components/navigator/reveal";
 import { NavigatorHero } from "@/components/navigator/navigator-hero";
 import { PhaseProgress } from "@/components/navigator/phase-progress";
+import { ScheduleCta } from "@/components/navigator/schedule-cta";
 import { GamePreviewCard } from "@/components/navigator/game-preview-card";
 import { RecapsEntryCard } from "@/components/navigator/recaps-entry-card";
 import { NotificationsCard } from "@/components/navigator/notifications-card";
@@ -59,35 +60,41 @@ export function NavigatorHome() {
       {/* First-time onboarding tour (auto-runs once; persisted in localStorage) */}
       <GuidedTour tour={TutorialTour.Attendee} steps={ATTENDEE_TOUR_STEPS} />
 
-      <Reveal delay={0}>
-        <NavigatorHero script={script} name={firstName} />
+      {/* Order per the client's revised mock: check-in + seat first, then the
+          journey and its schedule CTA, and only then Navi with her next step. */}
+      <Reveal delay={0} anchor={TourAnchor.Seat}>
+        <StatusCard attendee={attendee} />
       </Reveal>
 
       <Reveal delay={90} anchor={TourAnchor.Journey}>
         <PhaseProgress phase={phase} />
       </Reveal>
 
-      <Reveal delay={180} anchor={TourAnchor.Game}>
+      <Reveal delay={180} anchor={TourAnchor.NextAction}>
+        <ScheduleCta />
+      </Reveal>
+
+      <Reveal delay={270} className="pt-1">
+        <NavigatorHero script={script} name={firstName} />
+      </Reveal>
+
+      <Reveal delay={360} anchor={TourAnchor.Game}>
         <GamePreviewCard game={game} leaderboard={leaderboard} playerCount={onlineCount} />
       </Reveal>
 
-      <Reveal delay={270} anchor={TourAnchor.Recaps}>
+      <Reveal delay={450} anchor={TourAnchor.Recaps}>
         <RecapsEntryCard />
       </Reveal>
 
-      <Reveal delay={360} anchor={TourAnchor.Notifications}>
+      <Reveal delay={540} anchor={TourAnchor.Notifications}>
         <NotificationsCard />
       </Reveal>
 
-      <Reveal delay={450}>
-        <StatusCard attendee={attendee} />
-      </Reveal>
-
-      <Reveal delay={540}>
+      <Reveal delay={630}>
         <RemindersCard reminders={MOCK_REMINDERS} />
       </Reveal>
 
-      <Reveal delay={630} className="flex justify-center pt-1">
+      <Reveal delay={720} className="flex justify-center pt-1">
         <TutorialReplayButton tour={TutorialTour.Attendee} />
       </Reveal>
     </div>

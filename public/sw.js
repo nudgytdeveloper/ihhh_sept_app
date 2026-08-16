@@ -16,10 +16,10 @@ self.addEventListener("push", (event) => {
   try {
     payload = event.data ? event.data.json() : {};
   } catch {
-    payload = { title: "IHHH 2026", body: event.data ? event.data.text() : "" };
+    payload = { title: "IHH SG Learning Festival 2026", body: event.data ? event.data.text() : "" };
   }
 
-  const title = payload.title || "IHHH 2026";
+  const title = payload.title || "IHH SG Learning Festival 2026";
   const options = {
     body: payload.body || "",
     icon: payload.icon || "/icon-192.png",

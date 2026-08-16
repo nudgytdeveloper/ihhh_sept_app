@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
-import { Sparkles, UtensilsCrossed, DoorOpen, Bell } from "lucide-react";
+import { Sparkles, UtensilsCrossed, Armchair, Camera } from "lucide-react";
+import { EventPhase, PHASE_META } from "./phases";
 
 /**
  * Host Control Panel (Screen 5) constants. The panel drives GameStatus (see
@@ -14,11 +15,32 @@ export interface HostReminder {
   icon: LucideIcon;
 }
 
+/** One-tap nudges, keyed to the real programme lineup so times never drift. */
 export const HOST_REMINDERS: readonly HostReminder[] = [
-  { id: "rem_game", label: "Game starting", detail: "Join the lobby now", icon: Sparkles },
-  { id: "rem_buffet", label: "Buffet is open", detail: "Zone C · Level 3", icon: UtensilsCrossed },
-  { id: "rem_hall", label: "Return to the hall", detail: "Afternoon session begins", icon: DoorOpen },
-  { id: "rem_closing", label: "Closing keynote", detail: "Starts in 10 minutes", icon: Bell },
+  {
+    id: "rem_game",
+    label: "Game starting",
+    detail: "Join the lobby now — top 3 win prizes",
+    icon: Sparkles,
+  },
+  {
+    id: "rem_seated",
+    label: "Please be seated",
+    detail: `Find your seat before ${PHASE_META[EventPhase.StartOfEvent].time}`,
+    icon: Armchair,
+  },
+  {
+    id: "rem_photo",
+    label: "Group photo",
+    detail: "Get seated — winners up front",
+    icon: Camera,
+  },
+  {
+    id: "rem_food",
+    label: "Food collection",
+    detail: "Collect your lunch outside the event hall",
+    icon: UtensilsCrossed,
+  },
 ] as const;
 
 /** Severity/tone of an entry in the host activity log. */

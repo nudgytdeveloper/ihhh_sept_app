@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { Bell, ChevronLeft } from "lucide-react";
 import { ScheduleOverview } from "@/components/schedule/schedule-overview";
 import { ScheduleTimeline } from "@/components/schedule/schedule-timeline";
@@ -10,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { AVATAR_NAME } from "@/constants/app";
 import { ROUTES } from "@/constants/routes";
 import { usePlayerIdentity } from "@/utils/player-identity";
-import { MOCK_SCHEDULE } from "@/data/event";
+import { buildSchedule } from "@/utils/event";
 
 /**
  * Screen 2 — Event Schedule / Phase Timeline. Navi orients the attendee, then a
@@ -22,7 +23,11 @@ export function ScheduleScreen() {
   const phase = useEventPhase();
   const identity = usePlayerIdentity();
   const firstName = identity.name.split(" ")[0];
-  const footerDelay = 120 + MOCK_SCHEDULE.length * 70 + 80;
+  const schedule = useMemo(
+    () => buildSchedule(identity.seat?.seatId),
+    [identity.seat?.seatId],
+  );
+  const footerDelay = 120 + schedule.length * 70 + 80;
 
   return (
     <div className="flex flex-1 flex-col gap-5 px-4 pb-12 pt-6">
@@ -30,7 +35,7 @@ export function ScheduleScreen() {
         <ScheduleOverview phase={phase} name={firstName} />
       </Reveal>
 
-      <ScheduleTimeline items={MOCK_SCHEDULE} currentPhase={phase} />
+      <ScheduleTimeline items={schedule} currentPhase={phase} />
 
       <Reveal delay={footerDelay}>
         <div className="flex flex-col items-center gap-3 pt-1 text-center">

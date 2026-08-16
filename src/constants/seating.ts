@@ -318,3 +318,19 @@ export const PLAN_FIXTURES: readonly PlanFixture[] = [
 /** Zoom applied when the map focuses on a single seat. */
 export const SEAT_FOCUS_SCALE = 2.4;
 export const SEAT_FOCUS_TRANSITION_MS = 700;
+
+/**
+ * How a seat reads on the attendee's status tile. IHH asked for the bare seat
+ * id ("SEAT A12"), and for anyone without a designated seat to be sent to the
+ * Reception desk rather than shown a blank.
+ */
+export const SEAT_DISPLAY = {
+  /** Prefix on the assigned value, e.g. "SEAT A12". */
+  prefix: "SEAT",
+  /** Value shown when the attendee has no seat yet. */
+  unassignedLabel: "NA",
+  /** Red note beside the unassigned value. */
+  unassignedNote: "(Approach Reception)",
+  /** CTA into the Lecture Theatre plan. */
+  mapCta: "See Map",
+} as const;

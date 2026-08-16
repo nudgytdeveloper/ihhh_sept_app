@@ -5,33 +5,45 @@ import {
   Armchair,
   Mic,
   Gamepad2,
+  Award,
+  Camera,
   UtensilsCrossed,
   PartyPopper,
 } from "lucide-react";
 
 /**
- * The event journey. The Avatar Script Engine and the schedule timeline are
- * both driven by the current EventPhase.
+ * The event journey — the real IHH SG Learning Festival 2026 programme lineup.
+ * The Avatar Script Engine, the schedule timeline and the host's phase tabs are
+ * all driven by the current EventPhase.
  *
- * Registered → Seated → Opening → Game Session → Buffet → Closing
+ * Registered → Game Session → Start of Event → Opening → Award Presentation
+ *   → Winners / Group Photo → Food Collection → End of Event
+ *
+ * Registration and the game share the 11:30 slot ("Registration & Game Session"
+ * on the programme), so the clock-driven resolver lands on Game Session from
+ * 11:30 and Registered reads as done — matching the client's revised mock.
  */
 export enum EventPhase {
   Registered = "registered",
-  Seated = "seated",
-  Opening = "opening",
   GameSession = "game_session",
-  Buffet = "buffet",
-  Closing = "closing",
+  StartOfEvent = "start_of_event",
+  Opening = "opening",
+  AwardPresentation = "award_presentation",
+  WinnersGroupPhoto = "winners_group_photo",
+  FoodCollection = "food_collection",
+  EndOfEvent = "end_of_event",
 }
 
 /** Chronological order — drives the timeline + progress calculations. */
 export const PHASE_ORDER: readonly EventPhase[] = [
   EventPhase.Registered,
-  EventPhase.Seated,
-  EventPhase.Opening,
   EventPhase.GameSession,
-  EventPhase.Buffet,
-  EventPhase.Closing,
+  EventPhase.StartOfEvent,
+  EventPhase.Opening,
+  EventPhase.AwardPresentation,
+  EventPhase.WinnersGroupPhoto,
+  EventPhase.FoodCollection,
+  EventPhase.EndOfEvent,
 ] as const;
 
 /** Static Tailwind class bundle for a phase accent (kept literal so Tailwind detects them). */
@@ -50,20 +62,39 @@ export interface PhaseMeta {
   id: EventPhase;
   label: string;
   shortLabel: string;
+  /**
+   * Schedule copy. Supports a `{seat}` token — resolve it with `buildSchedule()`
+   * from `@/utils/event` rather than interpolating ad-hoc.
+   */
   description: string;
-  /** Display time for the demo schedule. */
+  /** Copy used instead of `description` when the attendee has no seat yet. */
+  descriptionUnassigned?: string;
+  /** Extra bullet lines under the description (e.g. the award certificates). */
+  details?: readonly string[];
+  /** Display time for the schedule. */
   time: string;
+  /**
+   * Scheduled start as minutes since midnight, Singapore time (UTC+8). The
+   * single source of truth for clock-driven phase advancement — never parse
+   * `time` back into a number.
+   */
+  startMinutes: number;
   icon: LucideIcon;
   accent: PhaseAccent;
 }
+
+/** Minutes-since-midnight helper, so the times below stay readable. */
+const at = (hour24: number, minute: number) => hour24 * 60 + minute;
 
 export const PHASE_META: Record<EventPhase, PhaseMeta> = {
   [EventPhase.Registered]: {
     id: EventPhase.Registered,
     label: "Registered",
     shortLabel: "Check-in",
-    description: "Welcome aboard — complete your check-in to get started.",
-    time: "8:30 AM",
+    description: `Welcome to ${EVENT_NAME}! Your seat number is {seat}.`,
+    descriptionUnassigned: `Welcome to ${EVENT_NAME}! Approach the Reception and we'll get you seated.`,
+    time: "11:30 AM",
+    startMinutes: at(11, 30),
     icon: BadgeCheck,
     accent: {
       text: "text-blue-600",
@@ -72,12 +103,31 @@ export const PHASE_META: Record<EventPhase, PhaseMeta> = {
       gradient: "from-blue-500 to-indigo-500",
     },
   },
-  [EventPhase.Seated]: {
-    id: EventPhase.Seated,
-    label: "Seated",
-    shortLabel: "Find seat",
-    description: "Your seat is ready — head in and settle down.",
-    time: "9:00 AM",
+  [EventPhase.GameSession]: {
+    id: EventPhase.GameSession,
+    label: "Game Session",
+    shortLabel: "Game",
+    description:
+      "Join the Fight and climb the Leaderboard! Top 3 winners receive prizes!",
+    time: "11:30 AM",
+    startMinutes: at(11, 30),
+    icon: Gamepad2,
+    accent: {
+      text: "text-teal-600",
+      soft: "bg-teal-500/10 text-teal-700",
+      solid: "bg-teal-500 text-white",
+      gradient: "from-teal-400 to-cyan-500",
+    },
+  },
+  [EventPhase.StartOfEvent]: {
+    id: EventPhase.StartOfEvent,
+    label: "Start of Event",
+    shortLabel: "Be seated",
+    description: "Please be seated. Your seat number is {seat}.",
+    descriptionUnassigned:
+      "Please be seated. Approach the Reception if you need help finding your seat.",
+    time: "11:55 AM",
+    startMinutes: at(11, 55),
     icon: Armchair,
     accent: {
       text: "text-sky-600",
@@ -90,8 +140,9 @@ export const PHASE_META: Record<EventPhase, PhaseMeta> = {
     id: EventPhase.Opening,
     label: "Opening",
     shortLabel: "Opening",
-    description: "The opening keynote is about to begin.",
-    time: "9:30 AM",
+    description: "Welcome Speech by Dr Peter Chow.",
+    time: "12:05 PM",
+    startMinutes: at(12, 5),
     icon: Mic,
     accent: {
       text: "text-violet-600",
@@ -100,27 +151,19 @@ export const PHASE_META: Record<EventPhase, PhaseMeta> = {
       gradient: "from-violet-500 to-purple-500",
     },
   },
-  [EventPhase.GameSession]: {
-    id: EventPhase.GameSession,
-    label: "Game Session",
-    shortLabel: "Game",
-    description: "It's game time — join the Virus Fight and climb the leaderboard!",
-    time: "10:45 AM",
-    icon: Gamepad2,
-    accent: {
-      text: "text-teal-600",
-      soft: "bg-teal-500/10 text-teal-700",
-      solid: "bg-teal-500 text-white",
-      gradient: "from-teal-400 to-cyan-500",
-    },
-  },
-  [EventPhase.Buffet]: {
-    id: EventPhase.Buffet,
-    label: "Buffet",
-    shortLabel: "Buffet",
-    description: "Buffet is open — relax and refuel.",
-    time: "12:00 PM",
-    icon: UtensilsCrossed,
+  [EventPhase.AwardPresentation]: {
+    id: EventPhase.AwardPresentation,
+    label: "Award Presentation",
+    shortLabel: "Awards",
+    description: "Presentation of awards for:",
+    details: [
+      "Certificate in Designing Training for Healthcare Professional",
+      "Certificate in Workplace Learning & Coaching",
+      "Leadership Development Programme",
+    ],
+    time: "12:10 PM",
+    startMinutes: at(12, 10),
+    icon: Award,
     accent: {
       text: "text-amber-600",
       soft: "bg-amber-500/10 text-amber-700",
@@ -128,12 +171,44 @@ export const PHASE_META: Record<EventPhase, PhaseMeta> = {
       gradient: "from-amber-400 to-orange-500",
     },
   },
-  [EventPhase.Closing]: {
-    id: EventPhase.Closing,
-    label: "Closing",
-    shortLabel: "Closing",
-    description: `That's a wrap — thanks for joining ${EVENT_NAME}!`,
-    time: "2:00 PM",
+  [EventPhase.WinnersGroupPhoto]: {
+    id: EventPhase.WinnersGroupPhoto,
+    label: "Winners / Group Photo",
+    shortLabel: "Photo",
+    description:
+      "Winners of Game Leaderboard! Get seated for a group photography.",
+    time: "12:45 PM",
+    startMinutes: at(12, 45),
+    icon: Camera,
+    accent: {
+      text: "text-rose-600",
+      soft: "bg-rose-500/10 text-rose-700",
+      solid: "bg-rose-500 text-white",
+      gradient: "from-rose-400 to-pink-500",
+    },
+  },
+  [EventPhase.FoodCollection]: {
+    id: EventPhase.FoodCollection,
+    label: "Food Collection",
+    shortLabel: "Food",
+    description: "Collect your lunch outside the event hall.",
+    time: "12:50 PM",
+    startMinutes: at(12, 50),
+    icon: UtensilsCrossed,
+    accent: {
+      text: "text-orange-600",
+      soft: "bg-orange-500/10 text-orange-700",
+      solid: "bg-orange-500 text-white",
+      gradient: "from-orange-400 to-amber-500",
+    },
+  },
+  [EventPhase.EndOfEvent]: {
+    id: EventPhase.EndOfEvent,
+    label: "End of Event",
+    shortLabel: "End",
+    description: `Thank you for joining us at ${EVENT_NAME}!`,
+    time: "1:00 PM",
+    startMinutes: at(13, 0),
     icon: PartyPopper,
     accent: {
       text: "text-indigo-600",

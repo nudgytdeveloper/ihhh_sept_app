@@ -1,46 +1,16 @@
-import { Gamepad2, UtensilsCrossed, Camera } from "lucide-react";
-import { EventPhase, PHASE_ORDER, PHASE_META } from "@/constants/phases";
-import { RegistrationStatus, SeatStatus } from "@/constants/statuses";
+import { Gamepad2, Armchair, UtensilsCrossed } from "lucide-react";
+import { EventPhase, PHASE_META } from "@/constants/phases";
 import { GameStatus, GAME_CONFIG } from "@/constants/game";
-import type {
-  Attendee,
-  EventState,
-  LeaderboardEntry,
-  Reminder,
-  ScheduleItem,
-} from "@/types";
+import type { EventState, LeaderboardEntry, Reminder } from "@/types";
 
 /**
- * Mock demo data. Visual polish matters more than backend completeness for the
- * demo, so screens read from here. Swap for a realtime backend later.
+ * Mock demo data. The real schedule is derived from `PHASE_META` — build it with
+ * `buildSchedule()` from `@/utils/event` so the attendee's seat is resolved into
+ * the copy. Only the solo-play leaderboard fallback and the proactive reminders
+ * live here now.
  */
 
-export const MOCK_ATTENDEE: Attendee = {
-  id: "att_001",
-  name: "Alex Tan",
-  initials: "AT",
-  company: "Northstar Health",
-  registration: RegistrationStatus.Complete,
-  seat: {
-    status: SeatStatus.Ready,
-    zone: "Zone B",
-    table: "Table 7",
-    seat: "Seat 3",
-  },
-};
-
-/** Full-day schedule, derived from the phase metadata. */
-export const MOCK_SCHEDULE: ScheduleItem[] = PHASE_ORDER.map((phase) => {
-  const meta = PHASE_META[phase];
-  return {
-    phase,
-    title: meta.label,
-    time: meta.time,
-    description: meta.description,
-  };
-});
-
-/** Sample Virus Fight leaderboard (current user highlighted). */
+/** Sample Virus Fight leaderboard — solo-play rank fallback only. */
 export const MOCK_LEADERBOARD: LeaderboardEntry[] = [
   { rank: 1, attendeeId: "att_044", name: "Priya N.", initials: "PN", score: 4820 },
   { rank: 2, attendeeId: "att_018", name: "Marcus L.", initials: "ML", score: 4510 },
@@ -67,29 +37,33 @@ export const MOCK_EVENT_STATE: EventState = {
   },
 };
 
-/** Proactive reminders the avatar surfaces on the home screen. */
+/**
+ * Proactive reminders the avatar surfaces on the home screen — times mirror the
+ * real programme lineup, so they stay in step with the schedule timeline.
+ */
 export const MOCK_REMINDERS: Reminder[] = [
   {
     id: "rem_game",
     title: "Virus Fight is starting",
     detail: "Join the lobby to grab your spot",
-    time: "10:45 AM",
+    time: PHASE_META[EventPhase.GameSession].time,
     icon: Gamepad2,
     accent: "bg-teal-500/10 text-teal-600",
   },
   {
-    id: "rem_buffet",
-    title: "Buffet opens at noon",
-    detail: "Zone C · Level 3",
-    time: "12:00 PM",
-    icon: UtensilsCrossed,
-    accent: "bg-amber-500/10 text-amber-600",
+    id: "rem_seated",
+    title: "Please be seated",
+    detail: "Find your seat before the event starts",
+    time: PHASE_META[EventPhase.StartOfEvent].time,
+    icon: Armchair,
+    accent: "bg-sky-500/10 text-sky-600",
   },
   {
-    id: "rem_photo",
-    title: "Photo booth open all day",
-    detail: "Near the main entrance",
-    icon: Camera,
-    accent: "bg-violet-500/10 text-violet-600",
+    id: "rem_food",
+    title: "Food collection",
+    detail: "Collect your lunch outside the event hall",
+    time: PHASE_META[EventPhase.FoodCollection].time,
+    icon: UtensilsCrossed,
+    accent: "bg-orange-500/10 text-orange-600",
   },
 ];

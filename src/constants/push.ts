@@ -71,7 +71,7 @@ export enum PushTag {
 /** Copy for the confirmation push sent right after an attendee opts in. */
 export const PUSH_WELCOME = {
   title: `You're all set for ${EVENT_NAME} 🔔`,
-  body: `${APP_SHORT_NAME} will ping you when it's game time, buffet, or your next session — even with the app closed.`,
+  body: `${APP_SHORT_NAME} will ping you when it's game time, the award presentation, or lunch — even with the app closed.`,
 } as const;
 
 /** Title prefix for an event-journey ("what's next") push. */
