@@ -2,6 +2,7 @@
 export * from "./app";
 export * from "./routes";
 export * from "./statuses";
+export * from "./seating";
 export * from "./phases";
 export * from "./game";
 export * from "./avatar-scripts";
@@ -12,6 +13,7 @@ export * from "./voice";
 export * from "./player";
 export * from "./registration";
 export * from "./roster";
+export * from "./attendance";
 export * from "./sessions";
 export * from "./summaries";
 export * from "./push";

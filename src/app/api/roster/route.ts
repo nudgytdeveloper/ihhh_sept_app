@@ -1,6 +1,7 @@
 import { getDb } from "@/server/db";
 import { listRoster } from "@/server/db/attendees";
 import { getOnlinePlayerIds } from "@/server/game-hub";
+import { seatInfoFor } from "@/utils/seats";
 import type { RosterEntry, RosterResponse } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -24,8 +25,10 @@ export async function GET() {
       id: record.id,
       name: record.name,
       email: record.email,
-      seat: record.seat,
+      // Seat-mapped attendees resolve from the plan; legacy rows keep theirs.
+      seat: record.seatId ? seatInfoFor(record.seatId) : record.legacySeat,
       goals: record.goals,
+      role: record.role,
       registeredAt: record.registeredAt.toISOString(),
       checkedInAt: record.checkedInAt?.toISOString() ?? null,
       score: record.score,

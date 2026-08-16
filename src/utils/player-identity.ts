@@ -7,11 +7,9 @@ import {
   PLAYER_NAME_ANIMALS,
   PLAYER_NAME_FALLBACK,
   PLAYER_STORAGE_KEYS,
-  SEAT_SEATS_PER_TABLE,
-  SEAT_TABLE_COUNT,
-  SEAT_ZONES,
 } from "@/constants/player";
 import { EMPTY_LEARNING_GOALS, REGISTER_API_PATH } from "@/constants/registration";
+import { ROSTER_API_PATH } from "@/constants/roster";
 import { RegistrationStatus, SeatStatus } from "@/constants/statuses";
 import { getInitials } from "@/utils/format";
 import { normalizeEmail } from "@/utils/registration";
@@ -20,11 +18,13 @@ import type { Attendee, LearningGoals, RegisteredAttendee, SeatInfo } from "@/ty
 /**
  * Per-device attendee identity for the Event Navigator.
  *
- * Each browser gets a stable random id, an auto-allocated seat, and a display
- * name — auto handle (e.g. "Swift Otter") until the welcome step, then the
- * attendee's entered name. Persisted to localStorage so it survives reloads and
- * stays distinct across phones. The same identity feeds the navigator persona
- * (name + seat on the home/schedule/status cards) and the shared leaderboard.
+ * Each browser gets a stable random id and a display name — auto handle (e.g.
+ * "Swift Otter") until the welcome step, then the attendee's entered name.
+ * Their **Lecture Theatre seat is issued by the server** at registration (the
+ * seat designated for them on the attendance list, else the next free one) and
+ * cached here. Persisted to localStorage so it survives reloads and stays
+ * distinct across phones. The same identity feeds the navigator persona (name +
+ * seat on the home/schedule/status cards) and the shared leaderboard.
  *
  * Bound to components via `usePlayerIdentity()` (useSyncExternalStore → SSR-safe,
  * no hydration mismatch). `completeRegistration()` updates it reactively.
@@ -34,7 +34,7 @@ export interface PlayerIdentity {
   id: string;
   /** Display name: the attendee's entered name, or an auto handle until set. */
   name: string;
-  /** Auto-allocated seat (assigned on first visit). */
+  /** Lecture Theatre seat issued by the server (unassigned until registered). */
   seat: SeatInfo;
   /** True once the attendee has completed the welcome (registered). */
   onboarded: boolean;
@@ -76,41 +76,30 @@ function pick(list: readonly string[]): string {
   return list[Math.floor(Math.random() * list.length)];
 }
 
-function randomInt(max: number): number {
-  return 1 + Math.floor(Math.random() * max);
-}
-
 function generateName(): string {
   return `${pick(PLAYER_NAME_ADJECTIVES)} ${pick(PLAYER_NAME_ANIMALS)}`;
 }
 
-/** A fresh, automatically-allocated seat. */
-function allocateSeat(): SeatInfo {
-  return {
-    status: SeatStatus.Ready,
-    zone: pick(SEAT_ZONES),
-    table: `Table ${randomInt(SEAT_TABLE_COUNT)}`,
-    seat: `Seat ${randomInt(SEAT_SEATS_PER_TABLE)}`,
-  };
-}
+/** No seat until the server assigns one at registration. */
+const PLACEHOLDER_SEAT: SeatInfo = { status: SeatStatus.Unassigned };
 
+/**
+ * The seat this device last received from the server. Seats are allocated
+ * server-side (designated seat if the email is on the attendance list, else the
+ * next free one), so an unregistered device simply has none yet.
+ */
 function readSeat(): SeatInfo {
   const raw = readStored(PLAYER_STORAGE_KEYS.seat);
   if (raw) {
     try {
       const parsed = JSON.parse(raw) as SeatInfo;
-      if (parsed && parsed.table && parsed.seat) return parsed;
+      if (parsed && (parsed.seatId || parsed.table)) return parsed;
     } catch {
-      /* fall through to a fresh allocation */
+      /* fall through to the unassigned placeholder */
     }
   }
-  const seat = allocateSeat();
-  writeStored(PLAYER_STORAGE_KEYS.seat, JSON.stringify(seat));
-  return seat;
+  return PLACEHOLDER_SEAT;
 }
-
-/** SSR placeholder seat (no localStorage on the server). */
-const PLACEHOLDER_SEAT: SeatInfo = { status: SeatStatus.Unassigned };
 
 /**
  * The stable identity for this device, creating + persisting one on first use.
@@ -233,7 +222,6 @@ export async function completeRegistration(details: RegistrationDetails): Promis
       name,
       email,
       goals: details.goals,
-      seat: current.seat,
     }),
   });
   if (!response.ok) {
@@ -258,6 +246,33 @@ export async function completeRegistration(details: RegistrationDetails): Promis
     goals: attendee.goals,
   };
   emit();
+}
+
+/**
+ * Re-read this device's seat from the server and adopt it. The host can move an
+ * attendee from the roster console at any time, so the cached seat is refreshed
+ * whenever the seat map is opened. Silently does nothing when the device isn't
+ * registered yet, or when the server has no database.
+ */
+export async function refreshSeat(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const current = getSnapshot();
+  if (!current.id || !current.onboarded) return;
+
+  try {
+    const response = await fetch(`${ROSTER_API_PATH}/${current.id}`, { cache: "no-store" });
+    if (!response.ok) return;
+    const { attendee } = (await response.json()) as {
+      attendee: Pick<RegisteredAttendee, "name" | "seat">;
+    };
+    const seat = attendee.seat ?? { status: SeatStatus.Unassigned };
+    if (JSON.stringify(seat) === JSON.stringify(current.seat)) return;
+    writeStored(PLAYER_STORAGE_KEYS.seat, JSON.stringify(seat));
+    cached = { ...current, seat };
+    emit();
+  } catch {
+    /* offline / server down — keep showing the cached seat */
+  }
 }
 
 /**

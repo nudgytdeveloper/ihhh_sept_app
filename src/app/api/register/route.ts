@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/server/db";
-import { upsertAttendee } from "@/server/db/attendees";
+import { registerAttendee } from "@/server/db/attendees";
 import { checkRateLimit, getClientId, rateLimitResponse } from "@/server/rate-limit";
 import { REGISTRATION_LIMITS } from "@/constants/registration";
 import { RateLimitBucket } from "@/constants/rate-limit";
+import { DEFAULT_ATTENDEE_ROLE } from "@/constants/seating";
 import { isValidEmail, normalizeEmail, sanitizeLearningGoals } from "@/utils/registration";
-import type { RegisteredAttendee, SeatInfo } from "@/types";
+import { nextFreeSeatId, seatInfoFor } from "@/utils/seats";
+import type { RegisteredAttendee } from "@/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +17,10 @@ export const dynamic = "force-dynamic";
  * canonical identity — and returns the stored record, which the client adopts
  * (id + seat) so a returning attendee recovers their original identity on a new
  * device. Email is capture-only (validated for shape, never verified).
+ *
+ * The **seat comes from the server**: an email already on the attendance list
+ * keeps the Lecture Theatre seat IHH designated for it, and anyone else is
+ * auto-allocated the next free seat (see `registerAttendee`).
  *
  * With no `DATABASE_URL` configured the registration is still accepted and
  * echoed back unpersisted (`persisted: false`) so local dev without Postgres
@@ -29,7 +35,6 @@ export async function POST(request: Request) {
     name?: unknown;
     email?: unknown;
     goals?: unknown;
-    seat?: unknown;
   };
   try {
     body = await request.json();
@@ -49,24 +54,32 @@ export async function POST(request: Request) {
   if (!goals) {
     return NextResponse.json({ error: "Invalid goals" }, { status: 400 });
   }
-  const seat =
-    typeof body.seat === "object" && body.seat !== null ? (body.seat as SeatInfo) : null;
   const playerId = typeof body.playerId === "string" ? body.playerId : undefined;
 
   const db = getDb();
   if (!db) {
-    const attendee: RegisteredAttendee = { id: playerId ?? "", name, email, seat, goals };
+    // No database: hand back the first seat on the plan so local dev still has
+    // something to render. Nothing is reserved, so seats can repeat.
+    const attendee: RegisteredAttendee = {
+      id: playerId ?? "",
+      name,
+      email,
+      seat: seatInfoFor(nextFreeSeatId([])),
+      goals,
+      role: DEFAULT_ATTENDEE_ROLE,
+    };
     return NextResponse.json({ attendee, persisted: false });
   }
 
   try {
-    const row = await upsertAttendee(db, { playerId, email, name, seat, goals });
+    const row = await registerAttendee(db, { playerId, email, name, goals });
     const attendee: RegisteredAttendee = {
       id: row.id,
       name: row.name,
       email: row.email,
-      seat: row.seat,
+      seat: row.seatId ? seatInfoFor(row.seatId) : row.seat,
       goals: row.goals,
+      role: row.role,
     };
     return NextResponse.json({ attendee, persisted: true });
   } catch (error) {

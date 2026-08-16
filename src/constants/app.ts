@@ -17,4 +17,5 @@ export const EVENT_FULL_NAME = "IHHH 2026 — Annual Health & Wellness Summit";
 export const EVENT_MONTH = "September 2026";
 /** Placeholder demo date — refine with the client's real schedule. */
 export const EVENT_DATE_ISO = "2026-09-18";
-export const EVENT_VENUE = "Grand Hall, Level 3";
+/** The real venue — its seat plan geometry lives in `@/constants/seating`. */
+export const EVENT_VENUE = "Gleneagles Hospital · Lecture Theatre";

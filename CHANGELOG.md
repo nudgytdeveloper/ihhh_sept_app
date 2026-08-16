@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-08-16
+
+### Added
+- Lecture Theatre seat map (Notion task 561): the real Gleneagles Hospital plan — rows A–H centre, J/K side blocks, C5/C6 crossed out, Entrance / Cert Table / Projector / AV Area / Emcee — rendered as SVG from parametric geometry (`src/constants/seating.ts` → `src/utils/seats.ts` → `components/seating/lecture-theatre-map.tsx`)
+- Attendee "Find my seat" screen at `/seat` (reached from the home seat tile): Navi names the seat, the plan zooms to it with a pulsing pin, and walking directions are derived from the plan geometry (`buildSeatDirections`) rather than written per attendee; a toggle switches between the zoom and the whole theatre
+- Pre-loaded attendance list: the 12 names/emails/seats IHH supplied (`src/constants/attendance.ts`), loaded into Postgres from the roster console with "Load IHH list"
+- Attendance CSV import (`Name, Email, Seat, Role`, header optional) alongside the existing export — `POST /api/roster/import`, parser + validation in `src/utils/attendance.ts`, `parseCsv` in `src/utils/csv.ts`
+- Seat + role editing on `/host/roster`: per-row seat picker (grouped by row, taken seats marked) and Staff / Supervisor / HOD / Guest tag, plus click-a-seat-on-the-plan assignment for the selected attendee — `PATCH /api/roster/[id]`, host-passcode protected
+- `GET /api/roster/[id]` so an attendee's device re-reads its own seat: a host re-assignment now reaches the phone (`refreshSeat()` on opening the seat map) instead of being masked by the cached copy
+- Duplicate-seat warning + "Seats assigned" stat on the roster; roster search now also matches a seat id
+- Seat-map design tokens (light + dark) and `seat-pulse` / `seat-ping` / `seat-callout-in` keyframes in `globals.css`; `AttendeeRole`, `SeatRow`, `SeatBlock`, `SeatZone`, `SeatCellStatus`, `MapView` enums
+
+### Changed
+- Seats are now issued by the **server** at registration: an email on the attendance list keeps the seat IHH designated for it, anyone else is auto-allocated the next free seat (back of the centre block first) — replacing the random `Zone B · Table 7 · Seat 3` allocation that ran per-device
+- `attendees` gains `seat_id` (unique — one person per seat, so a double-booking 409s instead of silently overwriting) and `role`; the old `seat` jsonb is kept read-only for rows registered before the seat map
+- Attendance CSV export gains a Role column and writes the bare seat id, so an export can be edited in Excel and imported straight back
+- `EVENT_VENUE` is now "Gleneagles Hospital · Lecture Theatre"
+
 ## 2026-07-14
 
 ### Changed

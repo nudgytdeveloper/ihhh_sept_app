@@ -3,12 +3,24 @@ import type { EventPhase } from "@/constants/phases";
 import type { RegistrationStatus, SeatStatus } from "@/constants/statuses";
 import type { GameStatus, BossShape } from "@/constants/game";
 import type { SessionStatus } from "@/constants/sessions";
+import type { AttendeeRole, SeatBlock, SeatRow } from "@/constants/seating";
 
-/** Where an attendee is sitting. */
+/**
+ * Where an attendee is sitting in the Lecture Theatre. `seatId` (e.g. "H3") is
+ * the canonical value — row, block and the walking directions are all derived
+ * from it via the plan geometry in `@/utils/seats`.
+ */
 export interface SeatInfo {
   status: SeatStatus;
+  /** Lecture Theatre seat id, e.g. "H3". */
+  seatId?: string;
+  row?: SeatRow;
+  block?: SeatBlock;
+  /** @deprecated banquet allocation from before the seat map — legacy rows only. */
   zone?: string;
+  /** @deprecated banquet allocation from before the seat map — legacy rows only. */
   table?: string;
+  /** @deprecated banquet allocation from before the seat map — legacy rows only. */
   seat?: string;
 }
 
@@ -31,6 +43,8 @@ export interface RegisteredAttendee {
   email: string;
   seat: SeatInfo | null;
   goals: LearningGoals;
+  /** Staff / Supervisor / HOD / Guest, as tagged on the attendance list. */
+  role: AttendeeRole;
 }
 
 /**
@@ -43,6 +57,8 @@ export interface RosterEntry {
   email: string;
   seat: SeatInfo | null;
   goals: LearningGoals;
+  /** Staff / Supervisor / HOD / Guest, editable in the host console. */
+  role: AttendeeRole;
   /** ISO timestamps (JSON-serialized). */
   registeredAt: string;
   checkedInAt: string | null;
@@ -56,6 +72,15 @@ export interface RosterEntry {
 export interface RosterResponse {
   available: boolean;
   roster: RosterEntry[];
+}
+
+/** One line of an imported attendance list (host CSV import / the IHH seed). */
+export interface AttendanceImportRow {
+  name: string;
+  email: string;
+  /** Lecture Theatre seat id, e.g. "H3" — empty to leave unassigned. */
+  seatId: string;
+  role: AttendeeRole;
 }
 
 /** A single event attendee (the current user, in the demo). */

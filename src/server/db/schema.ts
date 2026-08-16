@@ -9,6 +9,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { SessionStatus } from "@/constants/sessions";
+import { AttendeeRole, DEFAULT_ATTENDEE_ROLE } from "@/constants/seating";
 import type { LearningGoals, SeatInfo } from "@/types";
 
 /**
@@ -25,18 +26,32 @@ import type { LearningGoals, SeatInfo } from "@/types";
  * `checkedInAt` is stamped on the attendee's first live connection to the
  * event, making the roster double as the attendance list.
  */
-export const attendees = pgTable("attendees", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  email: text("email").notNull().unique(),
-  name: text("name").notNull(),
-  /** Auto-allocated seat, as shown at the welcome step. */
-  seat: jsonb("seat").$type<SeatInfo>(),
-  /** Learning goals picked/typed at registration — feeds the AI session summaries. */
-  goals: jsonb("goals").$type<LearningGoals>().notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  /** First live connection at the event (null = registered but not yet attended). */
-  checkedInAt: timestamp("checked_in_at", { withTimezone: true }),
-});
+export const attendees = pgTable(
+  "attendees",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull().unique(),
+    name: text("name").notNull(),
+    /**
+     * Lecture Theatre seat id, e.g. "H3" — the canonical seat. Null = on the
+     * list but not placed yet. Row, block and the walking directions are all
+     * derived from the plan geometry (`@/utils/seats`), never stored.
+     */
+    seatId: text("seat_id"),
+    /** Staff / Supervisor / HOD / Guest, tagged on the host roster. */
+    role: text("role").$type<AttendeeRole>().notNull().default(DEFAULT_ATTENDEE_ROLE),
+    /** @deprecated banquet seat from before the seat map — legacy rows, read-only. */
+    seat: jsonb("seat").$type<SeatInfo>(),
+    /** Learning goals picked/typed at registration — feeds the AI session summaries. */
+    goals: jsonb("goals").$type<LearningGoals>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** First live connection at the event (null = registered but not yet attended). */
+    checkedInAt: timestamp("checked_in_at", { withTimezone: true }),
+  },
+  // One person per seat. Postgres treats NULLs as distinct, so any number of
+  // attendees may sit unassigned; a double-booking raises 23505 instead.
+  (table) => [unique("attendees_seat_id_uq").on(table.seatId)],
+);
 
 export type AttendeeRow = typeof attendees.$inferSelect;
 

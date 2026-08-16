@@ -160,6 +160,7 @@ src/
 │  │  ├─ page.tsx             # Screen 1 (/) — thin; renders navigator-home (live phase + onboarded persona)
 │  │  ├─ schedule/page.tsx    # Screen 2  (/schedule) — thin; renders schedule-screen
 │  │  ├─ recaps/page.tsx      # attendee AI session recaps (/recaps, Nov Phase 4) — thin; renders recaps-screen
+│  │  ├─ seat/page.tsx        # find my seat (/seat) — thin; renders seat-screen (Lecture Theatre map + directions)
 │  │  └─ game/
 │  │     ├─ lobby/page.tsx    # Screen 3  (/game/lobby)
 │  │     └─ play/page.tsx     # Screen 4  (/game/play)
@@ -174,6 +175,7 @@ src/
 │     │  └─ publish/route.ts  # host POSTs phase/state/reminders; attendees POST scores (fan-out + best-score write-through to Postgres)
 │     ├─ register/route.ts    # attendee registration: upsert by corporate email → Postgres (graceful no-DB fallback)
 │     ├─ roster/route.ts      # host roster: attendees ⋈ best scores + online flags ({available:false} when no DB)
+│     │                       #   [id]/route.ts GET own placement (open) / PATCH seat+role (host token); import/route.ts POST an attendance list
 │     ├─ sessions/route.ts    # speaker sessions: GET list / POST create; [id]/route.ts GET/PATCH/DELETE (Phase 3)
 │     ├─ transcribe/route.ts  # STT: POST audio → ElevenLabs Scribe (reuses ELEVENLABS_API_KEY) → {text}; 501 when unset; GET {configured}
 │     ├─ summaries/route.ts   # AI recaps: POST generate/cache (Gemini, per attendee goals; cache-hit needs no key) + GET list; [id] PATCH edit (Phase 4)
@@ -183,10 +185,13 @@ src/
 │     └─ voice/route.ts       # Navi cloud TTS: POST a line → ElevenLabs (server-only key) → MP3; cached, 501 when unconfigured
 ├─ components/
 │  ├─ ui/                     # shadcn/ui primitives
-│  ├─ navigator/              # attendee screens (incl. notifications-card + notification-toggle — Web Push opt-in, Phase 5)
+│  ├─ navigator/              # attendee screens (incl. seat-screen, notifications-card + notification-toggle — Web Push opt-in, Phase 5)
+│  ├─ seating/                # lecture-theatre-map (SVG plan + MapLegend), shared by /seat and /host/roster
 │  └─ scaffold/               # dev placeholders (ScreenStub)
 ├─ constants/                 # ⚠️ all enums & literals live here (see rules)
 │  ├─ app.ts                  # app/event identity + AVATAR_NAME
+│  ├─ seating.ts              # Lecture Theatre plan geometry + SeatRow/Block/Zone/CellStatus, MapView, AttendeeRole
+│  ├─ attendance.ts           # PRELOADED_ATTENDEES (the IHH list) + CSV import headers/limits
 │  ├─ routes.ts               # ROUTES
 │  ├─ statuses.ts             # RegistrationStatus, SeatStatus, AvatarMood, ActionIntent
 │  ├─ phases.ts               # EventPhase, PHASE_ORDER, PHASE_META, PhaseProgressState
@@ -206,6 +211,8 @@ src/
 │  └─ index.ts                # barrel
 ├─ utils/                     # ⚠️ all reusable functions live here (see rules)
 │  ├─ format.ts               # formatCountdown, formatScore, getInitials, template
+│  ├─ seats.ts                # SEATS/SEAT_BY_ID from the plan specs + nextFreeSeatId, seatInfoFor, seatLabel, buildSeatDirections
+│  ├─ attendance.ts           # role parsing, attendance CSV parse/validate, duplicateSeatIds
 │  ├─ event.ts                # phase helpers (getPhaseState…) + getAvatarScript
 │  ├─ game.ts                 # game/leaderboard/host helpers (getGameStatusMeta, getLiveRank, toLeaderboard, getRankAmong, getHostControls…)
 │  ├─ shape-detection.ts      # boss draw-to-defeat matcher (matchShape / classifyStroke)
@@ -214,7 +221,7 @@ src/
 │  ├─ navi-voice.ts           # speakLine (ElevenLabs /api/voice → MP3, else Web Speech; auto-fallback) + useNaviVoice store
 │  ├─ player-identity.ts      # per-device identity (usePlayerIdentity, completeRegistration, attendeeFromIdentity)
 │  ├─ registration.ts         # email validation/normalization + learning-goal shaping (shared by gate + /api/register)
-│  ├─ csv.ts                  # generic CSV helpers (toCsvCell, buildCsv, downloadCsv)
+│  ├─ csv.ts                  # generic CSV helpers (toCsvCell, buildCsv, parseCsv, downloadCsv)
 │  ├─ roster.ts               # roster shaping (formatSeatLabel/GoalsLabel, filterRoster, summarizeRoster, rosterToCsv)
 │  ├─ sessions.ts             # session sanitize/validate (title/speaker/transcript), appendSegment, countWords, pickRecordingMime, isSessionStatus
 │  ├─ use-session-recorder.ts # useSessionRecorder — live STT recorder (Web Speech | Scribe MediaRecorder segments) → onSegment
@@ -234,9 +241,9 @@ src/
 │  ├─ push/
 │  │  └─ send.ts              # web-push sender (VAPID + aes128gcm): sendPushToAll/sendPhasePush/sendReminderPush; prunes 404/410 subs (Phase 5)
 │  └─ db/                     # Postgres persistence (Drizzle) — Nov event
-│     ├─ schema.ts            # attendees + game_scores + sessions + summaries + push_subscriptions (Phase 5)
+│     ├─ schema.ts            # attendees (seat_id unique + role) + game_scores + sessions + summaries + push_subscriptions
 │     ├─ index.ts             # lazy getDb() (null when DATABASE_URL unset; Render TLS)
-│     ├─ attendees.ts         # upsertAttendee (by email; id-collision retry) + markCheckedIn (memoized) + getAttendeeById + listRoster (⋈ scores)
+│     ├─ attendees.ts         # registerAttendee (by email; designated-or-next-free seat) + updateAttendeePlacement (seat/role, SeatTakenError) + importAttendance + markCheckedIn + getAttendeeById + listRoster (⋈ scores)
 │     ├─ scores.ts            # upsertBestScore (GREATEST keeps the event-best)
 │     ├─ sessions.ts          # create/list/get/update/delete sessions + toSession DTO mapper
 │     ├─ summaries.ts         # getSummary (by session×attendee) / listByAttendee / upsert (regenerate) / updateContent (edit) + toSummary
@@ -864,6 +871,56 @@ stamped on first SSE connect (and only once), best-of 300/150/400 persisted as
 SSE connection was open and false after close, roster ordering + search filter
 + 430px no-overflow (measured `scrollWidth === innerWidth` in-browser; only
 the table scrolls, inside its own container).
+
+## Lecture Theatre seat map (Notion task 561) — built
+
+The event runs in the **Gleneagles Hospital Lecture Theatre**, and IHH asked for
+three things: an attendance list with designated seats, the theatre map with
+seat labels, and attendees actually directed to their seat. All three are built
+on one source of truth — **plan geometry**, never per-attendee copy.
+
+- **Geometry** — `src/constants/seating.ts` holds the plan canvas
+  (1882×1291), `SEAT_ROW_SPECS` (rows A–H centre, J/K side blocks, uniform
+  69.7 pitch), `BLOCKED_SEAT_IDS` (C5/C6, crossed out on the printed plan),
+  `PLAN_FIXTURES` (Entrance, Cert Table, Projector, AV Area, Emcee), and the
+  `SeatRow` / `SeatBlock` / `SeatZone` / `SeatCellStatus` / `MapView` /
+  `AttendeeRole` enums. `src/utils/seats.ts` expands the specs into `SEATS` /
+  `SEAT_BY_ID` / `SEATS_BY_ROW`, and derives everything else:
+  `nextFreeSeatId()` (auto-allocation order — back of the centre block first, so
+  the front rows stay free for designated seats), `seatInfoFor()`, `seatLabel()`
+  and `buildSeatDirections()`. **Never hardcode a seat coordinate or a per-person
+  direction** — change the specs and the map, picker and directions all follow.
+- **Map** — `src/components/seating/lecture-theatre-map.tsx` renders it as SVG
+  (`MapLegend` beside it). Focus view centres + scales to one seat with a clamped
+  translate so the zoom never exposes empty canvas; the callout pin is clamped to
+  the plan bounds. `onSelectSeat` turns it into the host's seat picker.
+- **Seat assignment is server-side.** `attendees.seat_id` (unique — one person
+  per seat) + `attendees.role` in Postgres. Registration (`registerAttendee`)
+  matches by email: **on the attendance list → the seat IHH designated for them**;
+  otherwise the next free seat. Both paths are the same `/api/register` call, so
+  a pre-loaded list and walk-in self-registration coexist. The old `seat` jsonb
+  (banquet `Zone/Table/Seat`) is legacy read-only for rows registered before this.
+- **Attendee** — `/seat` (`components/navigator/seat-screen.tsx`): Navi names the
+  seat, the plan zooms to it, geometry-derived directions below, toggle to the
+  whole theatre. It calls `refreshSeat()` on open so a host re-assignment reaches
+  the phone rather than being masked by the localStorage copy.
+- **Host** — `/host/roster` is the attendance list: per-row seat picker + role
+  tag (Staff / Supervisor / HOD / Guest), click-a-seat-on-the-plan assignment for
+  the selected attendee, "Load IHH list" (the 12 names in
+  `src/constants/attendance.ts`), CSV import **and** export, duplicate-seat
+  warning. Writes go to `PATCH /api/roster/[id]` and `POST /api/roster/import`,
+  both **host-passcode protected**; `GET /api/roster/[id]` is open (an attendee
+  reading their own record by UUID).
+
+Verified against a production build + real local Postgres: import (12 rows), a
+listed email registering into its designated seat (H2, case/whitespace
+normalised), a walk-in auto-allocated the next free seat, seat move → 200,
+double-booking → 409, blocked seat → 400, role tag → 200; in-browser the seat
+screen rendered seat + zoom + the three derived steps, the console's
+click-a-seat moved an attendee and persisted, and a host move (H2 → A1) showed
+up on the attendee's next visit. No overflow at a 430px layout box, no console
+errors. **Deploy note:** run `npm run db:push` to add `seat_id` + `role` (and the
+seat unique constraint) before this works in production.
 
 ## First-time onboarding tutorial — wired
 

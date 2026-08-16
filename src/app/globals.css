@@ -128,6 +128,20 @@
   --sidebar-accent-foreground: oklch(0.44 0.08 196);
   --sidebar-border: oklch(0.92 0.012 250);
   --sidebar-ring: oklch(0.57 0.19 257);
+
+  /* Lecture Theatre seat map — plan surfaces, fixtures, seat zones */
+  --map-surface: oklch(0.975 0.008 247);
+  --map-stage: oklch(0.93 0.016 247);
+  --map-fixture: oklch(0.955 0.01 247);
+  --map-fixture-line: oklch(0.88 0.014 250);
+  --map-fixture-text: oklch(0.5 0.03 252);
+  --map-entrance: oklch(0.95 0.04 191);
+  --seat-priority: oklch(0.87 0.07 300);
+  --seat-standard: oklch(0.88 0.07 162);
+  --seat-general: oklch(0.89 0.05 233);
+  --seat-blocked: oklch(0.91 0.008 250);
+  --seat-assigned-line: oklch(0.45 0.05 257 / 0.5);
+  --seat-text: oklch(0.34 0.03 257);
 }
 
 .dark {
@@ -180,6 +194,20 @@
   --sidebar-accent-foreground: oklch(0.95 0.03 191);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.66 0.16 256);
+
+  /* Seat map — night mode */
+  --map-surface: oklch(0.25 0.03 257);
+  --map-stage: oklch(0.31 0.035 257);
+  --map-fixture: oklch(0.28 0.03 257);
+  --map-fixture-line: oklch(0.38 0.03 257);
+  --map-fixture-text: oklch(0.74 0.03 250);
+  --map-entrance: oklch(0.35 0.05 196);
+  --seat-priority: oklch(0.42 0.1 300);
+  --seat-standard: oklch(0.42 0.09 162);
+  --seat-general: oklch(0.42 0.07 233);
+  --seat-blocked: oklch(0.28 0.02 257);
+  --seat-assigned-line: oklch(0.9 0.01 247 / 0.5);
+  --seat-text: oklch(0.96 0.01 247 / 0.9);
 }
 
 @layer base {
@@ -404,6 +432,35 @@
   animation: ihhh-countdown-pop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+/* Seat map — the attendee's own seat breathing, pinging, and its callout pin */
+@keyframes ihhh-seat-pulse {
+  0%,
+  100% { filter: brightness(1); }
+  50% { filter: brightness(1.18); }
+}
+.animate-seat-pulse {
+  animation: ihhh-seat-pulse 2s ease-in-out infinite;
+}
+
+@keyframes ihhh-seat-ping {
+  0% { opacity: 0.9; transform: scale(0.7); }
+  70% { opacity: 0; transform: scale(1.6); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+.animate-seat-ping {
+  animation: ihhh-seat-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+@keyframes ihhh-seat-callout-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-seat-callout-in {
+  animation: ihhh-seat-callout-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-float,
   .animate-blink,
@@ -420,7 +477,10 @@
   .animate-navi-talk,
   .animate-navi-tip,
   .animate-confetti,
-  .animate-countdown-pop {
+  .animate-countdown-pop,
+  .animate-seat-pulse,
+  .animate-seat-ping,
+  .animate-seat-callout-in {
     animation: none;
   }
 }

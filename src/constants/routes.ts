@@ -20,6 +20,8 @@ export const ROUTES = {
   HOST_SESSIONS: "/host/sessions",
   /** Attendee AI session recaps (Nov-event Phase 4) */
   RECAPS: "/recaps",
+  /** Find my seat — the Lecture Theatre plan with the attendee's seat marked */
+  SEAT: "/seat",
 } as const;
 
 export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];

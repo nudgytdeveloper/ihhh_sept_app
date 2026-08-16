@@ -119,6 +119,17 @@ export const SCHEDULE_INTRO =
   "We're on {phase} right now, {name} — here's how the rest of your day unfolds.";
 
 /**
+ * Host's lines on the "find my seat" screen. Tokens: `{name}`, `{seat}`,
+ * `{row}` — render with `template()` from `@/utils/format`.
+ */
+export const SEAT_INTRO =
+  "You're in seat {seat}, {name} — Row {row}. I've marked it on the plan below.";
+
+/** Shown when the attendee is on the list but hasn't been placed yet. */
+export const SEAT_INTRO_UNASSIGNED =
+  "You're checked in, {name} — we're still setting a seat aside for you. The team at the Cert Table will point you to it.";
+
+/**
  * Host's coaching line for the game lobby (Screen 3). Token: `{name}` — render
  * with `template()` from `@/utils/format`.
  */
