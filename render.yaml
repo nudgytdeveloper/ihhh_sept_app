@@ -27,6 +27,11 @@ services:
       # --- Host control-room passcode (locks /host + host publish actions) ---
       - key: HOST_TOKEN
         sync: false
+      # --- Guest list escape hatch: comma-separated developer/admin addresses
+      #     that can always register, even when they're not on the client's
+      #     attendance list. Set this or you're locked out with everyone else.
+      - key: DEV_ADMIN_EMAILS
+        sync: false
       # --- Web Push (VAPID) — phone notifications ---
       - key: VAPID_PUBLIC_KEY
         sync: false

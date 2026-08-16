@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-08-17
+
+### Fixed
+- Render deploy failure (`ERR_PNPM_OUTDATED_LOCKFILE`): synced `pnpm-lock.yaml` with `read-excel-file`, which was added to `package.json` via npm
+
+### Added
+- `DEV_ADMIN_EMAILS` declared in `render.yaml` (`sync: false`) — it was required by the guest list but missing from the Blueprint
+
 ## 2026-08-16
 
 ### Added
