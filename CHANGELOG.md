@@ -3,9 +3,13 @@
 ## 2026-08-17
 
 ### Fixed
+- First-run tutorial swallowed every tap on the page, so a new attendee who tapped a button instead of following the coach mark got no response at all and read the app as frozen
+- The attendee tour's own step-1 instruction ("Tap 'See Map'") was impossible to follow while the tour was up
 - Render deploy failure (`ERR_PNPM_OUTDATED_LOCKFILE`): synced `pnpm-lock.yaml` with `read-excel-file`, which was added to `package.json` via npm
 
 ### Added
+- A stray tap during a tutorial tour now ends the tour, and follows the link it landed on so that single tap does what the user meant (links only — a tap over a host button never fires it)
+- "Tap anywhere else to close" hint in the tour callout
 - `DEV_ADMIN_EMAILS` declared in `render.yaml` (`sync: false`) — it was required by the guest list but missing from the Blueprint
 
 ## 2026-08-16

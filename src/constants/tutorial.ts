@@ -158,6 +158,8 @@ export const TUTORIAL_COPY = {
   done: "Got it",
   skip: "Skip tour",
   restart: "Replay tour",
+  /** Subtle hint under the controls — a stray tap ends the tour, it isn't a trap. */
+  dismissHint: "Tap anywhere else to close",
   ariaLabel: "App walkthrough",
   /** Step counter, e.g. "2 of 5". */
   step: (current: number, total: number) => `${current} of ${total}`,

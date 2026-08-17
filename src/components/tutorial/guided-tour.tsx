@@ -49,6 +49,7 @@ export function GuidedTour({ tour, steps }: { tour: TutorialTour; steps: Tutoria
   const [layout, setLayout] = useState<CalloutLayout | null>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
   const calloutElRef = useRef<HTMLDivElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef(0);
 
   // Portal is client-only (needs document.body); flip once after mount.
@@ -61,6 +62,30 @@ export function GuidedTour({ tour, steps }: { tour: TutorialTour; steps: Tutoria
     setRect(null);
     setLayout(null);
   }, [tour]);
+
+  /**
+   * A tap outside the callout used to be swallowed silently, so a first-time
+   * attendee reaching for the button under the dim — or following this tour's
+   * own "Tap 'See Map'" instruction — got no response at all and read the app as
+   * frozen. Now a stray tap ends the tour, and if it landed on a link we follow
+   * it so that single tap does what they meant. Links only: forwarding to a
+   * <button> could fire a host action (End game / Reset) nobody asked for.
+   */
+  const handleStrayTap = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const { clientX, clientY } = event;
+      const root = rootRef.current;
+      // Lift the overlay out of hit-testing for the measurement only, so we can
+      // see what the finger was actually over.
+      if (root) root.style.pointerEvents = "none";
+      const beneath = document.elementFromPoint(clientX, clientY);
+      if (root) root.style.pointerEvents = "";
+      const link = beneath?.closest<HTMLAnchorElement>("a[href]") ?? null;
+      finish();
+      link?.click();
+    },
+    [finish],
+  );
 
   // Auto-start once per device (after the screen paints its anchors).
   useEffect(() => {
@@ -176,6 +201,7 @@ export function GuidedTour({ tour, steps }: { tour: TutorialTour; steps: Tutoria
 
   return createPortal(
     <div
+      ref={rootRef}
       role="dialog"
       aria-modal="true"
       aria-label={TUTORIAL_COPY.ariaLabel}
@@ -186,9 +212,9 @@ export function GuidedTour({ tour, steps }: { tour: TutorialTour; steps: Tutoria
         else if (event.key === "ArrowLeft" && !isFirst) goBack();
       }}
     >
-      {/* Click-catcher — makes the page inert while the tour runs (no dismiss on
-          stray taps; the Skip button + Esc are the ways out). */}
-      <div className="absolute inset-0" aria-hidden="true" />
+      {/* Click-catcher — a stray tap ends the tour (and follows a link it landed
+          on) rather than being swallowed, so the screen is never a dead end. */}
+      <div className="absolute inset-0" aria-hidden="true" onClick={handleStrayTap} />
 
       {/* Spotlight — the huge box-shadow dims everything except this rect. */}
       <div
@@ -278,6 +304,10 @@ export function GuidedTour({ tour, steps }: { tour: TutorialTour; steps: Tutoria
               </Button>
             </div>
           </div>
+
+          <p className="mt-2 text-center text-[0.65rem] text-muted-foreground/70">
+            {TUTORIAL_COPY.dismissHint}
+          </p>
         </div>
       </div>
     </div>,

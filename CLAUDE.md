@@ -1021,6 +1021,15 @@ never nags again; a quiet **"Replay tour"** button re-triggers it on demand.
   e.g. the notifications card when push is off — are dropped so the counter stays
   honest; Esc/arrow-key nav; reduced-motion-guarded). `tutorial-replay-button.tsx`
   — the ghost "Replay tour" trigger.
+- **No tap is ever a dead end.** The full-screen click-catcher used to swallow
+  every tap outside the callout, so a first-time attendee who reached for the
+  button under the dim — or followed the tour's own *Tap "See Map"* instruction —
+  got nothing back and read the app as frozen (reported from the client demo). A
+  stray tap now **ends the tour**, and if it landed on a link the engine
+  **follows it**, so that one tap does what they meant. Deliberately links only:
+  forwarding to a `<button>` could fire a host action (End game / Reset) nobody
+  asked for. The callout carries a "Tap anywhere else to close" hint, and taps on
+  the callout itself still belong to its own controls.
 - Targets: `Reveal` gained a `data-tour` anchor passthrough; anchors sit on Navi
   (`navi-host`), the hero CTA (`navigator-hero`), the home cards (`navigator-home`),
   and the host panel's journey / flow / boss / reminders / leaderboard blocks.
