@@ -24,6 +24,11 @@
 .DS_Store
 *.pem
 
+# client docs dropped in the repo root (briefs, updates, attendance lists) —
+# reference material, not source. Assets that ship stay under public/.
+/*.pdf
+/*.xlsx
+
 # debug
 npm-debug.log*
 yarn-debug.log*
